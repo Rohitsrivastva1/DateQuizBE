@@ -1,0 +1,116 @@
+# API Documentation
+
+Base URL: `/api`
+
+---
+
+## Authentication APIs
+
+### 1. Signup
+- **Endpoint:** `POST /api/auth/signup`
+- **Description:** Register a new user.
+- **Request Body:**
+  - `name` (string, required)
+  - `email` (string, required)
+  - `password` (string, required)
+  - `age` (number, required)
+  - `city` (string, required)
+- **Response:**
+  - `201 Created` with user object on success
+  - `400 Bad Request` if missing fields
+  - `409 Conflict` if username or email exists
+  - `500 Internal Server Error` on failure
+
+---
+
+### 2. Login
+- **Endpoint:** `POST /api/auth/login`
+- **Description:** Authenticate a user and receive a JWT token.
+- **Request Body:**
+  - `username` (string, required)
+  - `password` (string, required)
+- **Response:**
+  - `200 OK` with `{ token, user }` on success
+  - `400 Bad Request` if missing fields
+  - `401 Unauthorized` if invalid credentials
+  - `500 Internal Server Error` on failure
+
+---
+
+### 3. Get User Profile
+- **Endpoint:** `GET /api/auth/profile`
+- **Description:** Get the authenticated user's profile.
+- **Authentication:** Required (Bearer token)
+- **Response:**
+  - `200 OK` with `{ user }`
+  - `401 Unauthorized` if not authenticated
+
+---
+
+## Pack APIs
+
+### 4. Get All Packs
+- **Endpoint:** `GET /api/packs/`
+- **Description:** Retrieve all packs, optionally filtered by category.
+- **Query Parameters:**
+  - `category` (string, optional)
+- **Response:**
+  - `200 OK` with `{ packs }`
+  - `500 Internal Server Error` on failure
+
+---
+
+### 5. Get Questions by Pack ID
+- **Endpoint:** `GET /api/packs/:packId/questions`
+- **Description:** Retrieve all questions for a specific pack.
+- **Authentication:** Required (Bearer token)
+- **Response:**
+  - `200 OK` with `{ questions }`
+  - `404 Not Found` if no questions for pack
+  - `500 Internal Server Error` on failure
+
+---
+
+## Partner APIs
+
+### 6. Send Partner Request
+- **Endpoint:** `POST /api/partner/request`
+- **Description:** Send a partner request to another user.
+- **Authentication:** Required (Bearer token)
+- **Request Body:**
+  - `reciever_username` (string, required) — Username of the user to send the request to
+- **Response:**
+  - `201 Created` with `{ message: "Request sent successfully" }` on success
+  - `400 Bad Request` if:
+    - You try to send a request to yourself
+    - One or both users already have a partner
+    - Request already sent
+  - `404 Not Found` if user does not exist
+  - `500 Internal Server Error` on failure
+
+### 7. Respond to Partner Request
+- **Endpoint:** `POST /api/partner/request/respond`
+- **Description:** Accept or reject a partner request.
+- **Authentication:** Required (Bearer token)
+- **Request Body:**
+  - `requester_id` (number, required) — ID of the user who sent the request
+  - `status` (string, required) — Must be `accepted` or `rejected`
+- **Response:**
+  - `200 OK` with message indicating approval or denial
+  - `400 Bad Request` if invalid status or unauthorized
+  - `404 Not Found` if request not found
+  - `500 Internal Server Error` on failure
+
+### 8. Get Incoming Partner Requests
+- **Endpoint:** `GET /api/partner/request`
+- **Description:** Get all incoming partner requests for the authenticated user.
+- **Authentication:** Required (Bearer token)
+- **Response:**
+  - `200 OK` with list of requests
+  - `500 Internal Server Error` on failure
+
+---
+
+## Notes
+- Endpoints requiring authentication expect a valid JWT token in the `Authorization: Bearer <token>` header.
+- All responses are in JSON format. 
