@@ -1,11 +1,11 @@
 module.exports = {
     // Database configuration for Supabase
     database: {
-        host: process.env.SUPABASE_DB_HOST || process.env.DB_HOST,
-        port: process.env.SUPABASE_DB_PORT || 5432,
-        database: process.env.SUPABASE_DB_NAME || process.env.DB_NAME,
-        user: process.env.SUPABASE_DB_USER || process.env.DB_USER,
-        password: process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD,
+        host: process.env.DB_PORT || process.env.DB_HOST,
+        port: process.env.SUPABASE_DB_PORT || 6543,
+        database: process.env.DB_NAME || process.env.DB_NAME,
+        user: process.env.DB_USER || process.env.DB_USER,
+        password: process.env.DB_PASSWORD || process.env.DB_PASSWORD,
         ssl: false, // Disable SSL completely
         // Additional parameters for connection pooler
         connectionTimeoutMillis: 10000,
