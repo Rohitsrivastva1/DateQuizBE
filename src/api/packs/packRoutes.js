@@ -7,7 +7,7 @@ const router = express.Router();
 
 router.get('/', getAllPacks);
 
-router.get('/:packId/questions',protect, getQuestionsByPackId);
+router.get('/:packId/questions', getQuestionsByPackId);
 
 module.exports = router;
 

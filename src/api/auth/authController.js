@@ -28,7 +28,11 @@ const signupUser = async (req, res) => {
 
         const newUser = await createUser(name, email, hashedPassword, age, city);
 
-        res.status(201).json(newUser);
+        const { password_hash, ...userWithoutPassword } = newUser;
+        res.status(201).json({
+          token: tokenService.generateToken(newUser.id),
+          user: userWithoutPassword
+        });
 
 
     }catch (error) {
@@ -67,7 +71,7 @@ const loginUser = async (req, res) => {
         const { password_hash, ...userWithoutPassword } = user;
 
        res.json({
-        token: tokenService.generateToken(userWithoutPassword),
+        token: tokenService.generateToken(userWithoutPassword.id),
         user: userWithoutPassword
        })
 

@@ -1,32 +1,32 @@
 const db = require('../../config/db');
 
-const createrPartnerRequest = async (requester_id, partner_id) => {
+const createrPartnerRequest = async (requester_id, receiver_id) => {
 
-    const query = ` INSERT INTO partner_requests (requester_id, partner_id, status) VALUES ($1, $2,'pending') returning *`;
+    const query = ` INSERT INTO partner_requests (requester_id, receiver_id, status) VALUES ($1, $2,'pending') returning *`;
 
-    const values = [requester_id, partner_id];
+    const values = [requester_id, receiver_id];
 
     const result = await db.query(query, values);
 
     return result.rows[0];
 }
 
-const findPendingRequests = async (requester_id, partner_id) => {
+const findPendingRequests = async (requester_id, receiver_id) => {
 
-    const query = ` SELECT * FROM partner_requests WHERE ((requester_id = $1 AND partner_id = $2) OR (requester_id = $2 AND partner_id = $1)) AND status = 'pending'`;
+    const query = ` SELECT * FROM partner_requests WHERE ((requester_id = $1 AND receiver_id = $2) OR (requester_id = $2 AND receiver_id = $1)) AND status = 'pending'`;
 
-    const {rows} = await db.query(query, [requester_id, partner_id]);
+    const {rows} = await db.query(query, [requester_id, receiver_id]);
 
     return rows[0];
 
 }       
 
-const findIncommingRequests = async (user_id) => {
+const findIncomingRequests = async (user_id) => {
     
-    const query = ` SELECT pr.id,pr.requester_id, u.username as requester_username From partner_requests pr JOIN users u ON pr.requester_id = u.id WHERE pr.partner_id = $1 AND pr.status = 'pending'`;
+    const query = ` SELECT pr.id,pr.requester_id, u.username as requester_username From partner_requests pr JOIN users u ON pr.requester_id = u.id WHERE pr.receiver_id = $1 AND pr.status = 'pending'`;
 
     const {rows} = await db.query(query, [user_id]);
-    return rows[0];
+    return { requests: rows };
 }
 
 const updateRequestStatus = async (request_id, status) => {
@@ -39,11 +39,11 @@ const updateRequestStatus = async (request_id, status) => {
 }
 
 const linkPartners = async (requester_id, partner_id) => {
-    const query1 = ` INSERT INTO partners (user_id, partner_id) VALUES ($1, $2)`;
+    const query1 = ` UPDATE users SET partner_id = $2 WHERE id = $1`;
     await db.query(query1, [requester_id, partner_id]);
-    const query2 = ` INSERT INTO partners (user_id, partner_id) VALUES ($2, $1)`;
+    const query2 = ` UPDATE users SET partner_id = $2 WHERE id = $1`;
     await db.query(query2, [partner_id, requester_id]);
 }
 
 
-module.exports = { createrPartnerRequest,findPendingRequests,findIncommingRequests,updateRequestStatus };
+module.exports = { createrPartnerRequest,findPendingRequests,findIncomingRequests,updateRequestStatus,linkPartners };
