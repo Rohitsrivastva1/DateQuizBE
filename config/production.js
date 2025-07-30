@@ -6,9 +6,7 @@ module.exports = {
         database: process.env.SUPABASE_DB_NAME || process.env.DB_NAME,
         user: process.env.SUPABASE_DB_USER || process.env.DB_USER,
         password: process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD,
-        ssl: process.env.NODE_ENV === 'production' ? {
-            rejectUnauthorized: false
-        } : false,
+        ssl: false, // Disable SSL completely
         // Additional parameters for connection pooler
         connectionTimeoutMillis: 10000,
         idleTimeoutMillis: 30000,
@@ -28,13 +26,38 @@ module.exports = {
         database: process.env.SUPABASE_DB_NAME || process.env.DB_NAME,
         user: process.env.SUPABASE_DB_USER || process.env.DB_USER,
         password: process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD,
-        ssl: process.env.NODE_ENV === 'production' ? {
-            rejectUnauthorized: false
-        } : false,
+        ssl: false, // Disable SSL completely
         connectionTimeoutMillis: 10000,
         idleTimeoutMillis: 30000,
         max: 20,
         application_name: 'datequiz-backend-direct'
+    },
+    
+    // SSL-enabled configurations for testing
+    databaseSSL: {
+        host: process.env.SUPABASE_DB_HOST || process.env.DB_HOST,
+        port: process.env.SUPABASE_DB_PORT || 5432,
+        database: process.env.SUPABASE_DB_NAME || process.env.DB_NAME,
+        user: process.env.SUPABASE_DB_USER || process.env.DB_USER,
+        password: process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD,
+        ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis: 10000,
+        idleTimeoutMillis: 30000,
+        max: 20,
+        application_name: 'datequiz-backend-ssl'
+    },
+    
+    databaseDirectSSL: {
+        host: (process.env.SUPABASE_DB_HOST || process.env.DB_HOST).replace('.pooler.', '.'),
+        port: process.env.SUPABASE_DB_PORT || 5432,
+        database: process.env.SUPABASE_DB_NAME || process.env.DB_NAME,
+        user: process.env.SUPABASE_DB_USER || process.env.DB_USER,
+        password: process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD,
+        ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis: 10000,
+        idleTimeoutMillis: 30000,
+        max: 20,
+        application_name: 'datequiz-backend-direct-ssl'
     },
     
     // Server configuration

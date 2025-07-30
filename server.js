@@ -3,7 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const config = require('./config/production');
-const { testConnection } = require('./src/config/db');
+const { testConnection, getConnectionType } = require('./src/config/db');
 
 const app = express();
 
@@ -32,7 +32,8 @@ app.get('/health', (req, res) => {
     res.status(200).json({ 
         status: 'OK', 
         timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development'
+        environment: process.env.NODE_ENV || 'development',
+        databaseConnection: getConnectionType()
     });
 });
 
@@ -67,6 +68,7 @@ const startServer = async () => {
         app.listen(PORT, HOST, () => {
             console.log(`Server running on ${HOST}:${PORT}`);
             console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`Database connection: ${getConnectionType()}`);
         });
     } catch (error) {
         console.error('Failed to start server due to database connection issue:', error);

@@ -3,6 +3,7 @@ const config = require('../../config/production');
 
 let pool;
 let isDirectConnection = false;
+let connectionType = '';
 
 // Function to create pool with specific config
 const createPool = (dbConfig) => {
@@ -16,11 +17,13 @@ const createPool = (dbConfig) => {
 // Test database connection on startup
 const testConnection = async () => {
     const connectionConfigs = [
-        { name: 'Pooler', config: config.database },
-        { name: 'Direct', config: config.databaseDirect }
+        { name: 'Pooler (No SSL)', config: config.database, type: 'pooler-no-ssl' },
+        { name: 'Direct (No SSL)', config: config.databaseDirect, type: 'direct-no-ssl' },
+        { name: 'Pooler (SSL)', config: config.databaseSSL, type: 'pooler-ssl' },
+        { name: 'Direct (SSL)', config: config.databaseDirectSSL, type: 'direct-ssl' }
     ];
 
-    for (const { name, config: dbConfig } of connectionConfigs) {
+    for (const { name, config: dbConfig, type } of connectionConfigs) {
         try {
             console.log(`🔄 Testing ${name} connection...`);
             
@@ -38,9 +41,11 @@ const testConnection = async () => {
             
             // Use this configuration for the main pool
             pool = createPool(dbConfig);
-            isDirectConnection = name === 'Direct';
+            isDirectConnection = name.includes('Direct');
+            connectionType = type;
             
             console.log(`✅ Using ${name} connection for the application`);
+            console.log(`🔧 Connection type: ${type}`);
             return;
             
         } catch (error) {
@@ -50,7 +55,7 @@ const testConnection = async () => {
                 port: dbConfig.port,
                 database: dbConfig.database,
                 user: dbConfig.user,
-                ssl: dbConfig.ssl ? 'enabled' : 'disabled'
+                ssl: dbConfig.ssl ? (typeof dbConfig.ssl === 'object' ? 'enabled-with-config' : 'enabled') : 'disabled'
             });
         }
     }
@@ -80,5 +85,6 @@ module.exports = {
     query: (text, params) => pool.query(text, params),
     pool,
     testConnection,
-    isDirectConnection: () => isDirectConnection
+    isDirectConnection: () => isDirectConnection,
+    getConnectionType: () => connectionType
 };
