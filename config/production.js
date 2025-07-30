@@ -1,18 +1,13 @@
 module.exports = {
-    // Database configuration for Supabase
+    // Database configuration using connection string
     database: {
-        host: process.env.SUPABASE_DB_HOST || process.env.DB_HOST,
-        port: process.env.SUPABASE_DB_PORT || 5432,
-        database: process.env.SUPABASE_DB_NAME || process.env.DB_NAME,
-        user: process.env.SUPABASE_DB_USER || process.env.DB_USER,
-        password: process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD,
+        connectionString:  "postgresql://postgres.epluqupenltlffznbmcx:9695700251@Rohit@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres",
         ssl: {
-            rejectUnauthorized: false,
-            ca: process.env.SUPABASE_DB_CA
-        },
+            rejectUnauthorized: false
+        }, // No SSL for local development
         max: 20, // Maximum number of clients in the pool
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
+        connectionTimeoutMillis: 10000,
     },
     
     // Server configuration
@@ -20,7 +15,7 @@ module.exports = {
         port: process.env.PORT || 5000,
         host: process.env.HOST || '0.0.0.0',
         cors: {
-            origin: process.env.FRONTEND_URL || 'https://your-frontend-domain.com',
+            origin: process.env.FRONTEND_URL || 'http://localhost:3000',
             credentials: true
         }
     },
