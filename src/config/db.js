@@ -1,7 +1,65 @@
 const { Pool } = require('pg');
 const config = require('../../config/production');
 
-const pool = new Pool(config.database);
+let pool;
+let isDirectConnection = false;
+
+// Function to create pool with specific config
+const createPool = (dbConfig) => {
+    return new Pool({
+        ...dbConfig,
+        keepAlive: true,
+        keepAliveInitialDelayMillis: 10000
+    });
+};
+
+// Test database connection on startup
+const testConnection = async () => {
+    const connectionConfigs = [
+        { name: 'Pooler', config: config.database },
+        { name: 'Direct', config: config.databaseDirect }
+    ];
+
+    for (const { name, config: dbConfig } of connectionConfigs) {
+        try {
+            console.log(`🔄 Testing ${name} connection...`);
+            
+            const testPool = createPool(dbConfig);
+            const client = await testPool.connect();
+            
+            console.log(`✅ ${name} database connection successful`);
+            
+            // Test a simple query
+            const result = await client.query('SELECT NOW() as current_time');
+            console.log(`✅ ${name} query test successful:`, result.rows[0]);
+            
+            client.release();
+            await testPool.end();
+            
+            // Use this configuration for the main pool
+            pool = createPool(dbConfig);
+            isDirectConnection = name === 'Direct';
+            
+            console.log(`✅ Using ${name} connection for the application`);
+            return;
+            
+        } catch (error) {
+            console.error(`❌ ${name} connection failed:`, error.message);
+            console.error(`${name} config:`, {
+                host: dbConfig.host,
+                port: dbConfig.port,
+                database: dbConfig.database,
+                user: dbConfig.user,
+                ssl: dbConfig.ssl ? 'enabled' : 'disabled'
+            });
+        }
+    }
+    
+    throw new Error('All database connection attempts failed');
+};
+
+// Create initial pool (will be replaced by testConnection)
+pool = createPool(config.database);
 
 // Test the connection
 pool.on('connect', () => {
@@ -13,25 +71,6 @@ pool.on('error', (err) => {
     process.exit(-1);
 });
 
-// Test database connection on startup
-const testConnection = async () => {
-    try {
-        const client = await pool.connect();
-        console.log('Database connection test successful');
-        client.release();
-    } catch (error) {
-        console.error('Database connection test failed:', error.message);
-        console.error('Database config:', {
-            host: config.database.host,
-            port: config.database.port,
-            database: config.database.database,
-            user: config.database.user,
-            ssl: config.database.ssl ? 'enabled' : 'disabled'
-        });
-        throw error;
-    }
-};
-
 // Test connection when module is loaded
 testConnection().catch(err => {
     console.error('Failed to connect to database:', err);
@@ -40,5 +79,6 @@ testConnection().catch(err => {
 module.exports = {
     query: (text, params) => pool.query(text, params),
     pool,
-    testConnection
+    testConnection,
+    isDirectConnection: () => isDirectConnection
 };

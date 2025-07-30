@@ -9,6 +9,7 @@
     "migrate": "node migrate.js",
     "test": "jest",
     "test-db": "node test-db-connection.js",
+    "check-config": "node check-supabase-config.js",
     "lint": "eslint .",
     "build": "echo 'No build step required for Node.js'",
     "postinstall": "echo 'Post-install complete'"

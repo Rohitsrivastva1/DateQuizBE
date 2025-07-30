@@ -9,9 +9,32 @@ module.exports = {
         ssl: process.env.NODE_ENV === 'production' ? {
             rejectUnauthorized: false
         } : false,
-        max: 20, // Maximum number of clients in the pool
+        // Additional parameters for connection pooler
+        connectionTimeoutMillis: 10000,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
+        max: 20,
+        // Required for Supabase connection pooler
+        application_name: 'datequiz-backend',
+        // Disable statement timeout for pooler
+        statement_timeout: 0,
+        // Set session timeout
+        session_timeout: 0
+    },
+    
+    // Alternative direct connection config (for fallback)
+    databaseDirect: {
+        host: (process.env.SUPABASE_DB_HOST || process.env.DB_HOST).replace('.pooler.', '.'),
+        port: process.env.SUPABASE_DB_PORT || 5432,
+        database: process.env.SUPABASE_DB_NAME || process.env.DB_NAME,
+        user: process.env.SUPABASE_DB_USER || process.env.DB_USER,
+        password: process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD,
+        ssl: process.env.NODE_ENV === 'production' ? {
+            rejectUnauthorized: false
+        } : false,
+        connectionTimeoutMillis: 10000,
+        idleTimeoutMillis: 30000,
+        max: 20,
+        application_name: 'datequiz-backend-direct'
     },
     
     // Server configuration
