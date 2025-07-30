@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const config = require('./config/production');
+const { testConnection } = require('./src/config/db');
 
 const app = express();
 
@@ -57,10 +58,23 @@ app.use('*', (req, res) => {
 const PORT = config.server.port;
 const HOST = config.server.host;
 
-app.listen(PORT, HOST, () => {
-    console.log(`Server running on ${HOST}:${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+// Start server only after database connection is established
+const startServer = async () => {
+    try {
+        // Test database connection before starting server
+        await testConnection();
+        
+        app.listen(PORT, HOST, () => {
+            console.log(`Server running on ${HOST}:${PORT}`);
+            console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+        });
+    } catch (error) {
+        console.error('Failed to start server due to database connection issue:', error);
+        process.exit(1);
+    }
+};
+
+startServer();
 
 // Graceful shutdown
 process.on('SIGTERM', () => {

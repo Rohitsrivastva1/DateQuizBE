@@ -8,6 +8,7 @@
     "dev": "nodemon server.js",
     "migrate": "node migrate.js",
     "test": "jest",
+    "test-db": "node test-db-connection.js",
     "lint": "eslint .",
     "build": "echo 'No build step required for Node.js'",
     "postinstall": "echo 'Post-install complete'"

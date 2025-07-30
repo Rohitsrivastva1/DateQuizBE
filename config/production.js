@@ -6,10 +6,9 @@ module.exports = {
         database: process.env.SUPABASE_DB_NAME || process.env.DB_NAME,
         user: process.env.SUPABASE_DB_USER || process.env.DB_USER,
         password: process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD,
-        ssl: {
-            rejectUnauthorized: false,
-            ca: process.env.SUPABASE_DB_CA
-        },
+        ssl: process.env.NODE_ENV === 'production' ? {
+            rejectUnauthorized: false
+        } : false,
         max: 20, // Maximum number of clients in the pool
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 2000,
