@@ -14,16 +14,14 @@ const getDatabaseConfig = () => {
         password: process.env.DB_PASSWORD || '',
         max: 20,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 10000, // Increased timeout
-        acquireTimeoutMillis: 10000,
+        connectionTimeoutMillis: 10000,
         allowExitOnIdle: true,
     };
 
-    // SSL configuration for production environments
+    // ✅ Proper SSL configuration
     if (isProduction || isSupabase || isRender) {
         baseConfig.ssl = {
-            rejectUnauthorized: false,
-            sslmode: 'require'
+            rejectUnauthorized: false
         };
     }
 
@@ -32,20 +30,19 @@ const getDatabaseConfig = () => {
 
 const pool = new Pool(getDatabaseConfig());
 
-// Test the connection
-pool.on('connect', (client) => {
+// Log connection status
+pool.on('connect', () => {
     console.log('✅ Connected to the database');
 });
 
-pool.on('error', (err, client) => {
+pool.on('error', (err) => {
     console.error('❌ Unexpected error on idle client', err);
-    // Don't exit the process in production, let it handle reconnection
     if (process.env.NODE_ENV !== 'production') {
         process.exit(-1);
     }
 });
 
-// Add connection testing function
+// Connection test function
 const testConnection = async () => {
     try {
         const client = await pool.connect();
