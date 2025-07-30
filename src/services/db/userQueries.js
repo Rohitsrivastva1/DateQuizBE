@@ -16,18 +16,46 @@ const createUser = async (username, email, password_hash, age, city) => {
 }
 
 const findUserByUsername = async (username) => {
-    const {rows} = await db.query(`Select * from users where username = $1`, [username]);
-    return rows[0];
+    try {
+        const {rows} = await db.query(`Select * from users where username = $1`, [username]);
+        return rows[0];
+    } catch (error) {
+        console.error('Error finding user by username:', error);
+        // Check if it's a connection error
+        if (error.code === 'ECONNREFUSED' || error.message.includes('SASL') || error.message.includes('SCRAM')) {
+            console.error('Database connection error detected');
+            throw new Error('Database connection failed. Please try again.');
+        }
+        throw error;
+    }
 }
 
 const findUserByEmail = async (email) => {
-    const {rows} = await db.query(`Select * from users where email = $1`, [email]);
-    return rows[0];
+    try {
+        const {rows} = await db.query(`Select * from users where email = $1`, [email]);
+        return rows[0];
+    } catch (error) {
+        console.error('Error finding user by email:', error);
+        if (error.code === 'ECONNREFUSED' || error.message.includes('SASL') || error.message.includes('SCRAM')) {
+            console.error('Database connection error detected');
+            throw new Error('Database connection failed. Please try again.');
+        }
+        throw error;
+    }
 }
 
 const findUserById = async (id) => {
-    const {rows} = await db.query(`Select * from users where id = $1`, [id]);
-    return rows[0];
+    try {
+        const {rows} = await db.query(`Select * from users where id = $1`, [id]);
+        return rows[0];
+    } catch (error) {
+        console.error('Error finding user by id:', error);
+        if (error.code === 'ECONNREFUSED' || error.message.includes('SASL') || error.message.includes('SCRAM')) {
+            console.error('Database connection error detected');
+            throw new Error('Database connection failed. Please try again.');
+        }
+        throw error;
+    }
 }
 
 module.exports = {

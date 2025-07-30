@@ -78,6 +78,22 @@ const loginUser = async (req, res) => {
 
     }catch (error) {
         console.error('Error logging in user', error);
+        
+        // Handle specific database connection errors
+        if (error.message.includes('Database connection failed')) {
+            return res.status(503).json({ 
+                error: 'Service temporarily unavailable. Please try again in a few moments.' 
+            });
+        }
+        
+        // Handle SASL/SCRAM authentication errors
+        if (error.message.includes('SASL') || error.message.includes('SCRAM')) {
+            console.error('SASL authentication error:', error);
+            return res.status(503).json({ 
+                error: 'Authentication service temporarily unavailable. Please try again.' 
+            });
+        }
+        
         res.status(500).json({ error: 'Failed to login' });
     }
 }

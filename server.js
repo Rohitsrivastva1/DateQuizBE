@@ -6,6 +6,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const config = require('./config/production');
+const { testConnection } = require('./src/config/db');
 
 const app = express();
 
@@ -30,12 +31,24 @@ app.use((req, res, next) => {
 });
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-    res.status(200).json({ 
-        status: 'OK', 
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development'
-    });
+app.get('/health', async (req, res) => {
+    try {
+        const dbConnected = await testConnection();
+        res.status(200).json({ 
+            status: 'OK', 
+            timestamp: new Date().toISOString(),
+            environment: process.env.NODE_ENV || 'development',
+            database: dbConnected ? 'connected' : 'disconnected'
+        });
+    } catch (error) {
+        res.status(503).json({ 
+            status: 'ERROR', 
+            timestamp: new Date().toISOString(),
+            environment: process.env.NODE_ENV || 'development',
+            database: 'error',
+            error: error.message
+        });
+    }
 });
 
 // API routes
@@ -60,10 +73,29 @@ app.use('*', (req, res) => {
 const PORT = config.server.port;
 const HOST = config.server.host;
 
-app.listen(PORT, HOST, () => {
-    console.log(`Server running on ${HOST}:${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+// Test database connection before starting server
+const startServer = async () => {
+    try {
+        console.log('Testing database connection...');
+        const dbConnected = await testConnection();
+        
+        if (!dbConnected) {
+            console.error('❌ Failed to connect to database. Server will start but may have issues.');
+        } else {
+            console.log('✅ Database connection successful');
+        }
+        
+        app.listen(PORT, HOST, () => {
+            console.log(`Server running on ${HOST}:${PORT}`);
+            console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+        });
+    } catch (error) {
+        console.error('❌ Error starting server:', error);
+        process.exit(1);
+    }
+};
+
+startServer();
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
