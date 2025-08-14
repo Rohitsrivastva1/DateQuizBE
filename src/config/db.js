@@ -20,6 +20,7 @@ const getDatabaseConfig = () => {
 
     // ✅ Proper SSL configuration
     if (isProduction || isSupabase || isRender) {
+        console.log('✅ SSL configuration');
         baseConfig.ssl = {
             rejectUnauthorized: false
         };

@@ -20,8 +20,22 @@ module.exports = {
         port: process.env.PORT || 5000,
         host: process.env.HOST || '0.0.0.0',
         cors: {
-            origin: process.env.FRONTEND_URL || 'https://your-frontend-domain.com',
-            credentials: true
+            origin: [
+                'http://localhost:3000',
+                'http://localhost:19006',
+                'http://192.168.31.53:3000',
+                'http://192.168.31.53:19006',
+                'exp://192.168.31.53:19000',
+                'exp://localhost:19000',
+                'http://localhost:8081',
+                'http://192.168.31.53:8081',
+                'http://localhost:19000',
+                'http://192.168.31.53:19000',
+                '*'
+            ],
+            credentials: true,
+            methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization']
         }
     },
     
