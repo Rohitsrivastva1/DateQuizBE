@@ -17,6 +17,15 @@ NODE_ENV=development
 
 # Frontend URL (for CORS)
 FRONTEND_URL=http://localhost:3000
+
+# Stripe Configuration (Add your actual keys for production)
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key_here
+STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_publishable_key_here
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
+
+# Stripe Product/Price IDs (Create these in your Stripe dashboard)
+STRIPE_PREMIUM_MONTHLY_PRICE_ID=price_premium_monthly
+STRIPE_PREMIUM_YEARLY_PRICE_ID=price_premium_yearly
 `;
 
 const envPath = path.join(__dirname, '.env');

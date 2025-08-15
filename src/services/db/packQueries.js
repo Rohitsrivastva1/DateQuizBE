@@ -1,22 +1,28 @@
 const db = require('../../config/db');
 
-const findAllPacks = async (category) => {
+const findAllPacks = async (category, userId = null) => {
+    let query = `
+        SELECT p.id, p.title, p.description, p.emoji, p.category, p.is_premium,
+               CASE WHEN p.is_premium = true THEN has_pack_access($1, p.id) ELSE true END as has_access
+        FROM packs p
+    `;
 
-    let query = `Select id,title,description,emoji,category,is_premium from packs`;
-
-    const queryParams = [];
+    const queryParams = [userId || 0];
 
     if (category) {
-        query += ` Where category = $1`;
+        query += ` WHERE p.category = $2`;
         queryParams.push(category);
     }
 
-    query += ` Order by id`;
+    query += ` ORDER BY p.id`;
 
     const {rows} = await db.query(query, queryParams);
 
-    return rows.map(pack =>({ ...pack, isPremium: pack.is_premium === 'true' }));
-
+    return rows.map(pack => ({ 
+        ...pack, 
+        isPremium: pack.is_premium === 'true',
+        hasAccess: pack.has_access
+    }));
 };
 
 const findQuestionsByPackId = async (packId) => {

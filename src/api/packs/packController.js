@@ -1,11 +1,14 @@
 const packQueries = require('../../services/db/packQueries');
 
  const getAllPacks = async (req, res) => {
-    console.log('getAllPacks',req.query);
+    console.log('GET ALL PACKS REQUEST', req.query);
     const {category} = req.query;
+    const userId = req.user?.id; // Get user ID if authenticated
 
     try{
-        const packs = await packQueries.findAllPacks(category);
+        const packs = await packQueries.findAllPacks(category, userId);
+        console.log('GET ALL PACKS RESPONSE STATUS 200');
+        console.log('GET ALL PACKS RESPONSE DATA', {packs});
         res.json({packs});
     }catch (error) {
         console.error('Error fetching packs', error);

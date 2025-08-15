@@ -56,6 +56,7 @@ app.use('/api/auth', require('./src/api/auth/authRoutes'));
 app.use('/api/packs', require('./src/api/packs/packRoutes'));
 app.use('/api/partner', require('./src/api/partner/partnerRoutes'));
 app.use('/api/partner-turn', require('./src/api/partner/partnerTurnRoutes'));
+app.use('/api/payments', require('./src/api/payments/paymentRoutes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
