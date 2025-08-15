@@ -1,5 +1,6 @@
-const { createrPartnerRequest,findPendingRequests,findIncomingRequests,updateRequestStatus,linkPartners } = require("../../services/db/PartnerQueries");
+const { createrPartnerRequest,findPendingRequests,findIncomingRequests,updateRequestStatus,linkPartners,disconnectPartners,createPartnerRequestNotification,createPartnerResponseNotification,findAnyExistingRequest } = require("../../services/db/PartnerQueries");
 const { findUserByUsername } = require("../../services/db/userQueries");
+const db = require("../../config/db");
 const crypto = require('crypto');
 
 // Generate a unique partner link
@@ -170,11 +171,8 @@ const disconnectPartner = async (req, res) => {
             });
         }
 
-        // Disconnect partners (you'll need to implement this)
-        // await disconnectPartners(userId, req.user.partner_id);
-        
-        // For demo purposes, we'll just return success
-        // In production, implement the actual database update
+        // Disconnect partners
+        await disconnectPartners(userId, req.user.partner_id);
         
         res.status(200).json({
             success: true,
@@ -209,21 +207,57 @@ const sendPartnerRequest = async (req,res) => {
         if(receiver.id === requester_id){
             return res.status(400).json({message: "You cannot send a request to yourself"});
         }
+
+        // Check if either user is already linked to a partner
         if(req.user.partner_id || receiver.partner_id){
             return res.status(409).json({message: "One or both users are already in a partnership"});
         }
 
-        const existingRequest = await findPendingRequests(requester_id, receiver.id);
-        console.log(existingRequest);
+        // Check for any existing request between these users (regardless of status)
+        const anyExistingRequest = await findAnyExistingRequest(requester_id, receiver.id);
+        console.log('Any existing request:', anyExistingRequest);
         
-        if(existingRequest){
-            return res.status(400).json({message: "Request already sent"});
+        if(anyExistingRequest) {
+            if(anyExistingRequest.status === 'pending') {
+                return res.status(400).json({message: "Request already sent"});
+            } else if(anyExistingRequest.status === 'approved') {
+                // If there's an approved request but users aren't actually linked, 
+                // this means there was an error during approval. Let's clean it up.
+                console.log('Found approved request but users not linked, cleaning up...');
+                try {
+                    await db.query('DELETE FROM partner_requests WHERE id = $1', [anyExistingRequest.id]);
+                } catch (error) {
+                    console.error('Error deleting inconsistent approved request:', error);
+                }
+            } else if(anyExistingRequest.status === 'denied') {
+                // If there was a denied request, we can allow a new request
+                // But first, let's delete the old denied request
+                try {
+                    await db.query('DELETE FROM partner_requests WHERE id = $1', [anyExistingRequest.id]);
+                } catch (error) {
+                    console.error('Error deleting old denied request:', error);
+                }
+            }
+        }
+
+        // Double-check that no request exists after cleanup
+        const checkAgain = await findAnyExistingRequest(requester_id, receiver.id);
+        if(checkAgain) {
+            console.log('Still found existing request after cleanup, deleting it...');
+            try {
+                await db.query('DELETE FROM partner_requests WHERE id = $1', [checkAgain.id]);
+            } catch (error) {
+                console.error('Error deleting remaining request:', error);
+            }
         }
 
         console.log(receiver.id,requester_id);
         
 
         await createrPartnerRequest(requester_id, receiver.id);
+        
+        // Create notification for the receiver
+        await createPartnerRequestNotification(receiver.id, req.user.username);
         
         res.status(201).json({message: "Request sent successfully"});
 
@@ -270,10 +304,17 @@ const respondToRequest = async (req,res) => {
 
         if(response === 'approved'){
             await linkPartners(request.requester_id, request.receiver_id);
+            
+            // Create notification for the requester about approval
+            await createPartnerResponseNotification(request.requester_id, req.user.username, 'approved');
+            
             return res.status(200).json({message: "Request approved successfully, you are now partners"});
 
         }           
 
+        // Create notification for the requester about denial
+        await createPartnerResponseNotification(request.requester_id, req.user.username, 'denied');
+        
         return res.status(200).json({message: "Request Denied."});
 
     }catch(error){
