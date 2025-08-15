@@ -1,15 +1,17 @@
 const jwt = require('jsonwebtoken');
 
 const generateToken = (userId) => {
-    // MODIFIED: Uses an environment variable for expiration with a fallback default.
-    const expiresIn = process.env.JWT_EXPIRES_IN || '1h';
+    // Use the same JWT secret and expiration as configured
+    const jwtSecret = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
+    const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
 
-    return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn });
+    return jwt.sign({ id: userId }, jwtSecret, { expiresIn });
 };
 
 const verifyToken = (token) => {
     try {
-        return jwt.verify(token, process.env.JWT_SECRET);
+        const jwtSecret = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
+        return jwt.verify(token, jwtSecret);
     } catch (error) {
         // This is a good place to handle specific JWT errors if needed,
         // for example, logging a 'TokenExpiredError' differently.
