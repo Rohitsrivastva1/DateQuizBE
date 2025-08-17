@@ -1,5 +1,6 @@
 const { query } = require('../../config/db');
 const { createUser, findUserByUsername, findUserByEmail } = require('../../services/db/userQueries');
+const pushNotificationService = require('../../services/pushNotificationService');
 const bcrypt = require('bcryptjs');
 const tokenService = require('../../services/security/tokenService');
 
@@ -108,9 +109,31 @@ const getUserProfile = async (req, res) => {
     });
 };
 
+const savePushToken = async (req, res) => {
+    try {
+        const { pushToken } = req.body;
+        const userId = req.user.id;
+
+        if (!pushToken) {
+            return res.status(400).json({ error: 'Push token is required' });
+        }
+
+        // Save the push token to the database
+        await pushNotificationService.saveUserPushToken(userId, pushToken);
+
+        res.json({ 
+            message: 'Push token saved successfully',
+            success: true 
+        });
+    } catch (error) {
+        console.error('Error saving push token:', error);
+        res.status(500).json({ error: 'Failed to save push token' });
+    }
+};
 
 module.exports = {
     signupUser,
     loginUser,
-    getUserProfile
+    getUserProfile,
+    savePushToken
 }

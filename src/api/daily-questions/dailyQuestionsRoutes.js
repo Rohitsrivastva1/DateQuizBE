@@ -8,7 +8,10 @@ const {
     setCoupleName,
     getNotifications,
     markNotificationRead,
-    getQuestionHistory
+    getQuestionHistory,
+    clearAllNotifications,
+    getMissedQuestions,
+    submitAnswerForQuestion
 } = require('./dailyQuestionsController');
 
 // All routes are protected with authentication
@@ -32,7 +35,16 @@ router.get('/notifications', getNotifications);
 // Mark notification as read
 router.put('/notifications/:notificationId/read', markNotificationRead);
 
+// Clear all notifications for the user
+router.delete('/notifications/clear-all', clearAllNotifications);
+
 // Get question history
 router.get('/history', getQuestionHistory);
+
+// Get missed questions and streak warning
+router.get('/missed', getMissedQuestions);
+
+// Submit answer for a specific question (for missed questions)
+router.post('/answer-question', submitAnswerForQuestion);
 
 module.exports = router;

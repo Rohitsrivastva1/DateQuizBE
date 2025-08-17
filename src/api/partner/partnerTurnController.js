@@ -1,5 +1,6 @@
 const partnerTurnQueries = require('../../services/db/partnerTurnQueries');
 const packQueries = require('../../services/db/packQueries');
+const db = require('../../config/db'); // Added db import
 
 // Start a new partner turn
 const startPartnerTurn = async (req, res) => {
@@ -300,6 +301,32 @@ const getPartnerDecks = async (req, res) => {
     }
 };
 
+const clearAllPartnerTurns = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        
+        // Mark all partner turns as viewed for the user
+        const query = `
+            UPDATE partner_turns 
+            SET is_viewed = true, viewed_at = NOW() 
+            WHERE (user_id = $1 OR partner_id = $1) AND is_viewed = false
+        `;
+        
+        const result = await db.query(query, [userId]);
+        
+        console.log(`Cleared all partner turns for user ${userId}. Rows affected: ${result.rowCount}`);
+        
+        res.json({ 
+            success: true, 
+            message: 'All partner turns cleared successfully',
+            clearedCount: result.rowCount 
+        });
+    } catch (error) {
+        console.error('Error clearing all partner turns:', error);
+        res.status(500).json({ error: 'Failed to clear partner turns' });
+    }
+};
+
 module.exports = {
     startPartnerTurn,
     submitPartnerAnswer,
@@ -307,5 +334,6 @@ module.exports = {
     getPartnerTurnReveal,
     getPartnerDecks,
     markTurnAsViewed,
-    getDeckQuestions
+    getDeckQuestions,
+    clearAllPartnerTurns
 }; 

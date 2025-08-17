@@ -584,6 +584,253 @@ const getQuestionHistory = async (req, res) => {
     }
 };
 
+// Clear all notifications for the user
+const clearAllNotifications = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const clearQuery = `
+            UPDATE daily_notifications 
+            SET is_read = true
+            WHERE user_id = $1
+        `;
+        const result = await pool.query(clearQuery, [userId]);
+
+        res.json({
+            success: true,
+            message: 'All notifications cleared',
+            clearedCount: result.rowCount
+        });
+
+    } catch (error) {
+        console.error('Error clearing all notifications:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error' 
+        });
+    }
+};
+
+// Get missed questions and streak warning
+const getMissedQuestions = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const today = new Date().toISOString().split('T')[0];
+
+        // Get missed questions (questions from the last 7 days that user hasn't answered)
+        const missedQuestionsQuery = `
+            SELECT 
+                dq.id,
+                dq.question_text,
+                dq.category,
+                dq.question_date,
+                CASE 
+                    WHEN dq.question_date = $2 THEN 'today'
+                    WHEN dq.question_date = DATE($2 - INTERVAL '1 day') THEN 'yesterday'
+                    ELSE 'missed'
+                END as status
+            FROM daily_questions dq
+            LEFT JOIN user_daily_answers uda ON dq.id = uda.question_id AND uda.user_id = $1
+            WHERE dq.question_date >= DATE($2 - INTERVAL '6 days')
+                AND dq.question_date <= $2
+                AND dq.is_active = true
+                AND uda.id IS NULL
+            ORDER BY dq.question_date DESC
+        `;
+        const missedQuestionsResult = await pool.query(missedQuestionsQuery, [userId, today]);
+        const missedQuestions = missedQuestionsResult.rows;
+
+        // Get current streak info
+        const streakQuery = `
+            SELECT current_streak, longest_streak
+            FROM user_streaks us
+            JOIN partner_requests pr ON (us.user_id = pr.requester_id AND us.partner_id = pr.receiver_id) 
+                OR (us.user_id = pr.receiver_id AND us.partner_id = pr.requester_id)
+            WHERE us.user_id = $1 AND pr.status = 'approved'
+        `;
+        const streakResult = await pool.query(streakQuery, [userId]);
+        const currentStreak = streakResult.rows[0]?.current_streak || 0;
+
+        // Calculate days until streak breaks
+        const daysUntilStreakBreaks = Math.max(0, 2 - missedQuestions.length);
+        const streakWarning = daysUntilStreakBreaks <= 1;
+
+        // Get partner info for today's question
+        const partnerQuery = `
+            SELECT 
+                CASE 
+                    WHEN pr.requester_id = $1 THEN pr.receiver_id
+                    ELSE pr.requester_id
+                END as partner_id,
+                u.username as partner_username
+            FROM partner_requests pr
+            JOIN users u ON u.id = (
+                CASE 
+                    WHEN pr.requester_id = $1 THEN pr.receiver_id
+                    ELSE pr.requester_id
+                END
+            )
+            WHERE (pr.requester_id = $1 OR pr.receiver_id = $1) AND pr.status = 'approved'
+        `;
+        const partnerResult = await pool.query(partnerQuery, [userId]);
+        const partner = partnerResult.rows[0];
+
+        res.json({
+            success: true,
+            missedQuestions: missedQuestions.map(q => ({
+                id: q.id,
+                text: q.question_text,
+                category: q.category,
+                date: q.question_date,
+                status: q.status
+            })),
+            streakInfo: {
+                currentStreak: currentStreak,
+                daysUntilStreakBreaks: daysUntilStreakBreaks,
+                streakWarning: streakWarning,
+                missedCount: missedQuestions.length
+            },
+            partner: partner ? {
+                id: partner.partner_id,
+                username: partner.partner_username
+            } : null
+        });
+
+    } catch (error) {
+        console.error('Error getting missed questions:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error' 
+        });
+    }
+};
+
+// Submit answer for a specific question (for missed questions)
+const submitAnswerForQuestion = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { questionId, answerText } = req.body;
+
+        if (!questionId || !answerText || !answerText.trim()) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Question ID and answer text are required' 
+            });
+        }
+
+        // Check if question exists and is active
+        const questionQuery = `
+            SELECT id, question_date
+            FROM daily_questions 
+            WHERE id = $1 AND is_active = true
+        `;
+        const questionResult = await pool.query(questionQuery, [questionId]);
+        
+        if (questionResult.rows.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Question not found or inactive' 
+            });
+        }
+
+        const question = questionResult.rows[0];
+        const today = new Date().toISOString().split('T')[0];
+
+        // Check if user has already answered this question
+        const existingAnswerQuery = `
+            SELECT id FROM user_daily_answers 
+            WHERE user_id = $1 AND question_id = $2
+        `;
+        const existingAnswerResult = await pool.query(existingAnswerQuery, [userId, questionId]);
+        
+        if (existingAnswerResult.rows.length > 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'You have already answered this question' 
+            });
+        }
+
+        // Insert the answer
+        const insertAnswerQuery = `
+            INSERT INTO user_daily_answers (user_id, question_id, answer_text, answered_at)
+            VALUES ($1, $2, $3, NOW())
+        `;
+        await pool.query(insertAnswerQuery, [userId, questionId, answerText.trim()]);
+
+        // Update streaks if this is today's question or yesterday's question
+        if (question.question_date === today || question.question_date === new Date(Date.now() - 24*60*60*1000).toISOString().split('T')[0]) {
+            await updateStreaks(userId, question.question_date);
+        }
+
+        res.json({
+            success: true,
+            message: 'Answer submitted successfully',
+            questionDate: question.question_date
+        });
+
+    } catch (error) {
+        console.error('Error submitting answer for question:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error' 
+        });
+    }
+};
+
+// Helper function to update streaks
+const updateStreaks = async (userId, questionDate) => {
+    try {
+        // Get partner info
+        const partnerQuery = `
+            SELECT 
+                CASE 
+                    WHEN pr.requester_id = $1 THEN pr.receiver_id
+                    ELSE pr.requester_id
+                END as partner_id
+            FROM partner_requests pr
+            WHERE (pr.requester_id = $1 OR pr.receiver_id = $1) AND pr.status = 'approved'
+        `;
+        const partnerResult = await pool.query(partnerQuery, [userId]);
+        
+        if (partnerResult.rows.length === 0) return;
+
+        const partnerId = partnerResult.rows[0].partner_id;
+
+        // Check if both partners answered this question
+        const bothAnsweredQuery = `
+            SELECT 
+                (SELECT COUNT(*) FROM user_daily_answers WHERE user_id = $1 AND question_id = $3) as user_answered,
+                (SELECT COUNT(*) FROM user_daily_answers WHERE user_id = $2 AND question_id = $3) as partner_answered
+        `;
+        const bothAnsweredResult = await pool.query(bothAnsweredQuery, [userId, partnerId, questionDate]);
+        const bothAnswered = bothAnsweredResult.rows[0];
+
+        if (bothAnswered.user_answered > 0 && bothAnswered.partner_answered > 0) {
+            // Both answered, update streaks
+            const updateStreakQuery = `
+                INSERT INTO user_streaks (user_id, partner_id, current_streak, longest_streak, last_answered_date)
+                VALUES ($1, $2, 1, 1, $3)
+                ON CONFLICT (user_id, partner_id) 
+                DO UPDATE SET 
+                    current_streak = CASE 
+                        WHEN user_streaks.last_answered_date = DATE($3 - INTERVAL '1 day') 
+                        THEN user_streaks.current_streak + 1
+                        ELSE 1
+                    END,
+                    longest_streak = CASE 
+                        WHEN user_streaks.last_answered_date = DATE($3 - INTERVAL '1 day') 
+                        THEN GREATEST(user_streaks.current_streak + 1, user_streaks.longest_streak)
+                        ELSE GREATEST(1, user_streaks.longest_streak)
+                    END,
+                    last_answered_date = $3
+            `;
+            await pool.query(updateStreakQuery, [userId, partnerId, questionDate]);
+        }
+    } catch (error) {
+        console.error('Error updating streaks:', error);
+    }
+};
+
 module.exports = {
     getTodaysQuestion,
     submitAnswer,
@@ -591,5 +838,8 @@ module.exports = {
     setCoupleName,
     getNotifications,
     markNotificationRead,
-    getQuestionHistory
+    getQuestionHistory,
+    clearAllNotifications,
+    getMissedQuestions,
+    submitAnswerForQuestion
 };

@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const pushNotificationService = require('../pushNotificationService');
 
 const createrPartnerRequest = async (requester_id, receiver_id) => {
 
@@ -67,6 +68,13 @@ const createPartnerRequestNotification = async (receiver_id, requester_username)
     const query = ` INSERT INTO daily_notifications (user_id, notification_type, message) VALUES ($1, 'partner_request', $2)`;
     const message = `${requester_username} sent you a partner request!`;
     await db.query(query, [receiver_id, message]);
+    
+    // Send push notification
+    try {
+        await pushNotificationService.sendPartnerRequestNotification(receiver_id, requester_username);
+    } catch (error) {
+        console.error('Error sending push notification for partner request:', error);
+    }
 }
 
 const createPartnerResponseNotification = async (requester_id, receiver_username, response) => {
@@ -75,6 +83,13 @@ const createPartnerResponseNotification = async (requester_id, receiver_username
         ? `${receiver_username} accepted your partner request! You are now partners! 💕`
         : `${receiver_username} declined your partner request.`;
     await db.query(query, [requester_id, message]);
+    
+    // Send push notification
+    try {
+        await pushNotificationService.sendPartnerResponseNotification(requester_id, receiver_username, response === 'approved');
+    } catch (error) {
+        console.error('Error sending push notification for partner response:', error);
+    }
 }
 
 module.exports = { 

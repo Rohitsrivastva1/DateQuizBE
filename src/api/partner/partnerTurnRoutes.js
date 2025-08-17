@@ -4,11 +4,12 @@ const { protect } = require('../../middleware/authmiddleware');
 const { 
     startPartnerTurn, 
     submitPartnerAnswer, 
-    getUnreadPartnerTurns, 
     getPartnerTurnReveal, 
-    getPartnerDecks,
-    markTurnAsViewed,
-    getDeckQuestions
+    getUnreadPartnerTurns, 
+    getPartnerDecks, 
+    markTurnAsViewed, 
+    getDeckQuestions,
+    clearAllPartnerTurns 
 } = require('./partnerTurnController');
 
 router.use(protect);
@@ -20,5 +21,6 @@ router.get('/reveal/:turnId', getPartnerTurnReveal);
 router.get('/decks', getPartnerDecks);
 router.post('/view/:turnId', markTurnAsViewed);
 router.get('/decks/:deckId/questions', getDeckQuestions);
+router.delete('/clear-all', protect, clearAllPartnerTurns);
 
 module.exports = router; 
