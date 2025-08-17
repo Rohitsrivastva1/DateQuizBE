@@ -5,7 +5,10 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const config = require('./config/production');
+// Load config based on environment
+const config = process.env.NODE_ENV === 'production' 
+    ? require('./config/production') 
+    : require('./config/development');
 const { testConnection } = require('./src/config/db');
 
 const app = express();
@@ -13,9 +16,14 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-// Rate limiting
-const limiter = rateLimit(config.rateLimit);
-app.use(limiter);
+// Rate limiting - disabled in development
+if (process.env.NODE_ENV === 'production') {
+    const limiter = rateLimit(config.rateLimit);
+    app.use(limiter);
+    console.log('🔒 Rate limiting enabled for production');
+} else {
+    console.log('🚀 Rate limiting disabled for development');
+}
 
 // CORS configuration
 app.use(cors(config.server.cors));

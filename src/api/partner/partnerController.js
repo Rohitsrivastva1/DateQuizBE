@@ -128,6 +128,7 @@ const getPartnerStatus = async (req, res) => {
         const hasPartner = !!req.user.partner_id;
         let partnerInfo = null;
         let partnerLink = null;
+        let coupleName = null;
         
         if (hasPartner) {
             // Get partner information
@@ -140,6 +141,15 @@ const getPartnerStatus = async (req, res) => {
                 username: 'Partner User' // Replace with actual query
             };
             
+            // Get couple name
+            const coupleNameQuery = `
+                SELECT couple_name
+                FROM couple_names
+                WHERE (user_id = $1 AND partner_id = $2) OR (user_id = $2 AND partner_id = $1)
+            `;
+            const coupleNameResult = await db.query(coupleNameQuery, [userId, req.user.partner_id]);
+            coupleName = coupleNameResult.rows[0]?.couple_name;
+            
             // Generate partner link if needed
             // partnerLink = `datequiz://partner/connect/${linkToken}`;
         }
@@ -147,7 +157,8 @@ const getPartnerStatus = async (req, res) => {
         res.status(200).json({
             hasPartner,
             partnerInfo,
-            partnerLink
+            partnerLink,
+            coupleName
         });
         
     } catch (error) {

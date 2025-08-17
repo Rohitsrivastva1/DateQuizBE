@@ -560,7 +560,7 @@ const getQuestionHistory = async (req, res) => {
             FROM daily_questions dq
             LEFT JOIN user_daily_answers uda ON dq.id = uda.question_id AND uda.user_id = $1
             LEFT JOIN user_daily_answers pda ON dq.id = pda.question_id AND pda.user_id = (
-                SELECT partner_id FROM partner_requests WHERE user_id = $1 AND status = 'approved'
+                SELECT partner_id FROM users WHERE id = $1
             )
             WHERE dq.question_date <= CURRENT_DATE
             ORDER BY dq.question_date DESC
@@ -588,6 +588,7 @@ const getQuestionHistory = async (req, res) => {
 const clearAllNotifications = async (req, res) => {
     try {
         const userId = req.user.id;
+        console.log(`Clearing all notifications for user ${userId}`);
 
         const clearQuery = `
             UPDATE daily_notifications 
@@ -595,6 +596,8 @@ const clearAllNotifications = async (req, res) => {
             WHERE user_id = $1
         `;
         const result = await pool.query(clearQuery, [userId]);
+
+        console.log(`Cleared ${result.rowCount} notifications for user ${userId}`);
 
         res.json({
             success: true,

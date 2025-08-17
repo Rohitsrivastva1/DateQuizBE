@@ -305,21 +305,43 @@ const clearAllPartnerTurns = async (req, res) => {
     try {
         const userId = req.user.id;
         
-        // Mark all partner turns as viewed for the user
-        const query = `
-            UPDATE partner_turns 
-            SET is_viewed = true, viewed_at = NOW() 
-            WHERE (user_id = $1 OR partner_id = $1) AND is_viewed = false
-        `;
+        // Get all unread partner turns for this user
+        const unreadTurns = await partnerTurnQueries.getUnreadPartnerTurns(userId);
         
-        const result = await db.query(query, [userId]);
+        let clearedCount = 0;
         
-        console.log(`Cleared all partner turns for user ${userId}. Rows affected: ${result.rowCount}`);
+        // For each unread turn, mark it as viewed by adding a "viewed" flag to the answers
+        for (const turn of unreadTurns) {
+            try {
+                // Get the current turn data
+                const currentTurn = await partnerTurnQueries.getPartnerTurnById(turn.turn_id);
+                if (currentTurn) {
+                    let answers = currentTurn.answers || {};
+                    if (typeof answers === 'string') {
+                        answers = JSON.parse(answers);
+                    }
+                    
+                    // Add a viewed flag for this user
+                    answers[`viewed_${userId}`] = {
+                        viewed: true,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    // Update the turn with the viewed flag
+                    await partnerTurnQueries.updatePartnerTurnAnswers(turn.turn_id, answers);
+                    clearedCount++;
+                }
+            } catch (turnError) {
+                console.error(`Error clearing turn ${turn.turn_id}:`, turnError);
+            }
+        }
+        
+        console.log(`Cleared ${clearedCount} partner turns for user ${userId}`);
         
         res.json({ 
             success: true, 
             message: 'All partner turns cleared successfully',
-            clearedCount: result.rowCount 
+            clearedCount: clearedCount
         });
     } catch (error) {
         console.error('Error clearing all partner turns:', error);

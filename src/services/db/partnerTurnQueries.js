@@ -122,8 +122,12 @@ const getUnreadPartnerTurns = async (userId) => {
         const partnerId = turn.requester_id === userId ? turn.receiver_id : turn.requester_id;
         const partnerAnswer = answers[partnerId.toString()];
         
-        // Show if partner has answered but user hasn't
-        return !userAnswer && partnerAnswer;
+        // Check if user has viewed this turn
+        const viewedKey = `viewed_${userId}`;
+        const hasViewed = answers[viewedKey]?.viewed === true;
+        
+        // Show if partner has answered but user hasn't AND user hasn't viewed it
+        return !userAnswer && partnerAnswer && !hasViewed;
     }).map(turn => {
         const answers = typeof turn.answers === 'string' ? JSON.parse(turn.answers) : turn.answers;
         const userAnswer = answers[userId.toString()];
@@ -209,6 +213,20 @@ const markTurnAsViewed = async (turnId, userId) => {
     return result.rows[0];
 };
 
+// Update partner turn answers (for clearing all turns)
+const updatePartnerTurnAnswers = async (turnId, answers) => {
+    const query = `
+        UPDATE partner_turn_questions 
+        SET answers = $1, updated_at = NOW()
+        WHERE id = $2
+        RETURNING *
+    `;
+    
+    const values = [JSON.stringify(answers), turnId];
+    const result = await db.query(query, values);
+    return result.rows[0];
+};
+
 // Get partner decks (decks that can be played with partner)
 const getPartnerDecks = async () => {
     const query = `
@@ -225,6 +243,7 @@ module.exports = {
     createPartnerTurn,
     getPartnerTurnById,
     updatePartnerTurnAnswer,
+    updatePartnerTurnAnswers,
     getUnreadPartnerTurns,
     getPartnerTurnForReveal,
     getUserPartner,
