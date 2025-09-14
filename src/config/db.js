@@ -34,11 +34,7 @@ const getDatabaseConfig = () => {
         
         return {
             connectionString: connectionString,
-            ssl: {
-                rejectUnauthorized: false,
-                checkServerIdentity: () => undefined,
-                secureProtocol: 'TLSv1_2_method'
-            },
+            // Don't override SSL when using connection string - let the connection string handle it
             max: 20,
             idleTimeoutMillis: 30000,
             connectionTimeoutMillis: 10000,
