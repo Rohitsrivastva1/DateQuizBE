@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 class OTPService {
     constructor() {
@@ -95,20 +96,66 @@ class OTPService {
     }
 
     /**
-     * Send OTP via email (mock implementation)
-     * In production, integrate with email service like SendGrid, AWS SES, etc.
+     * Create email transporter
+     * @returns {object} Nodemailer transporter
+     */
+    createTransporter() {
+        return nodemailer.createTransporter({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER || 'schoolabe10@gmail.com',
+                pass: process.env.EMAIL_PASS || 'ejmv hrau cogi qqxx'
+            }
+        });
+    }
+
+    /**
+     * Send OTP via email using Gmail SMTP
      * @param {string} email 
      * @param {string} otp 
      * @returns {Promise<boolean>}
      */
     async sendOTPEmail(email, otp) {
         try {
-            // Mock email sending - in production, replace with actual email service
-            console.log(`📧 Mock OTP Email sent to ${email}: ${otp}`);
-            console.log(`📧 In production, this would be sent via email service`);
+            const transporter = this.createTransporter();
             
-            // Simulate email sending delay
-            await new Promise(resolve => setTimeout(resolve, 100));
+            const mailOptions = {
+                from: process.env.EMAIL_USER || 'schoolabe10@gmail.com',
+                to: email,
+                subject: 'DateQuiz - Email Verification Code',
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <div style="text-align: center; margin-bottom: 30px;">
+                            <h1 style="color: #e91e63; font-size: 28px; margin: 0;">DateQuiz</h1>
+                            <p style="color: #666; font-size: 16px; margin: 10px 0;">Your Dating Adventure Awaits!</p>
+                        </div>
+                        
+                        <div style="background: #f8f9fa; padding: 30px; border-radius: 10px; text-align: center;">
+                            <h2 style="color: #333; margin-bottom: 20px;">Email Verification</h2>
+                            <p style="color: #666; font-size: 16px; margin-bottom: 25px;">
+                                Please use the following verification code to complete your account setup:
+                            </p>
+                            
+                            <div style="background: #e91e63; color: white; font-size: 32px; font-weight: bold; padding: 20px; border-radius: 8px; letter-spacing: 5px; margin: 20px 0;">
+                                ${otp}
+                            </div>
+                            
+                            <p style="color: #666; font-size: 14px; margin-top: 20px;">
+                                This code will expire in 5 minutes.
+                            </p>
+                        </div>
+                        
+                        <div style="text-align: center; margin-top: 30px; color: #999; font-size: 12px;">
+                            <p>If you didn't request this code, please ignore this email.</p>
+                            <p>© 2024 DateQuiz. All rights reserved.</p>
+                        </div>
+                    </div>
+                `
+            };
+
+            const result = await transporter.sendMail(mailOptions);
+            console.log(`📧 OTP Email sent to ${email}: ${otp}`);
+            console.log(`📧 Message ID: ${result.messageId}`);
             
             return true;
         } catch (error) {
