@@ -1,67 +1,33 @@
 const { Pool } = require('pg');
 
-// Try multiple connection methods for better compatibility
-const createPoolWithFallback = (config) => {
-    return new Pool(config);
-};
-
 // Database configuration for different environments
 const getDatabaseConfig = () => {
     const isProduction = process.env.NODE_ENV === 'production';
-    const isSupabase = (process.env.SUPABASE_DB_HOST || process.env.DB_HOST || '').includes('supabase.com');
-    const isRender = (process.env.SUPABASE_DB_HOST || process.env.DB_HOST || '').includes('render.com');
+    const isSupabase = (process.env.DB_HOST || '').includes('supabase.com');
 
-    // For Supabase, use individual parameters with proper SSL config instead of connection string
-    // This avoids certificate chain issues
-
-    const baseConfig = {
-        host: process.env.SUPABASE_DB_HOST || process.env.DB_HOST || 'localhost',
-        port: process.env.SUPABASE_DB_PORT || process.env.DB_PORT || 5432,
-        database: process.env.SUPABASE_DB_NAME || process.env.DB_NAME || 'datequiz',
-        user: process.env.SUPABASE_DB_USER || process.env.DB_USER || 'postgres',
-        password: process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD || '',
+    return {
+        host: process.env.DB_HOST || 'localhost',
+        port: process.env.DB_PORT || 5432,
+        database: process.env.DB_NAME || 'datequiz',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || '',
+        ssl: (isProduction || isSupabase) ? { rejectUnauthorized: false } : false,
         max: 20,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 10000,
-        allowExitOnIdle: true,
+        connectionTimeoutMillis: 2000,
     };
-
-    // Log database configuration for debugging
-    console.log('🔍 Database Configuration:');
-    console.log('  Host:', baseConfig.host);
-    console.log('  Port:', baseConfig.port);
-    console.log('  Database:', baseConfig.database);
-    console.log('  User:', baseConfig.user);
-    console.log('  Password:', baseConfig.password ? '***' : 'not set');
-    console.log('  Production:', isProduction);
-    console.log('  Supabase:', isSupabase);
-    console.log('  Render:', isRender);
-
-    // ✅ Proper SSL configuration for production databases
-    if (isProduction || isSupabase || isRender) {
-        console.log('✅ SSL configuration for production database');
-        baseConfig.ssl = {
-            rejectUnauthorized: false,
-            checkServerIdentity: () => undefined,
-            secureProtocol: 'TLSv1_2_method'
-        };
-    }
-
-    return baseConfig;
 };
 
-const pool = createPoolWithFallback(getDatabaseConfig());
+const pool = new Pool(getDatabaseConfig());
 
-// Log connection status
+// Test the connection
 pool.on('connect', () => {
     console.log('✅ Connected to the database');
 });
 
 pool.on('error', (err) => {
     console.error('❌ Unexpected error on idle client', err);
-    if (process.env.NODE_ENV !== 'production') {
-        process.exit(-1);
-    }
+    process.exit(-1);
 });
 
 // Connection test function
