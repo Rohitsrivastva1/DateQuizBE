@@ -11,15 +11,15 @@ console.log('DB Password:', process.env.DB_PASSWORD ? '***' : 'not set');
 
 const testConnection = async () => {
     const isProduction = process.env.NODE_ENV === 'production';
-    const isSupabase = (process.env.DB_HOST || '').includes('supabase.com');
-    const isRender = (process.env.DB_HOST || '').includes('render.com');
+    const isSupabase = (process.env.SUPABASE_DB_HOST || process.env.DB_HOST || '').includes('supabase.com');
+    const isRender = (process.env.SUPABASE_DB_HOST || process.env.DB_HOST || '').includes('render.com');
 
     const config = {
-        host: process.env.DB_HOST || 'localhost',
-        port: process.env.DB_PORT || 5432,
-        database: process.env.DB_NAME || 'datequiz',
-        user: process.env.DB_USER || 'postgres',
-        password: process.env.DB_PASSWORD || '',
+        host: process.env.SUPABASE_DB_HOST || process.env.DB_HOST || 'localhost',
+        port: process.env.SUPABASE_DB_PORT || process.env.DB_PORT || 5432,
+        database: process.env.SUPABASE_DB_NAME || process.env.DB_NAME || 'datequiz',
+        user: process.env.SUPABASE_DB_USER || process.env.DB_USER || 'postgres',
+        password: process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD || '',
         connectionTimeoutMillis: 10000,
         acquireTimeoutMillis: 10000,
     };
