@@ -1,79 +1,6 @@
 const pool = require('../../config/db');
 
-// Get today's question preview (public - no login required)
-const getTodaysQuestionPreview = async (req, res) => {
-    try {
-        const today = new Date().toISOString().split('T')[0];
-
-        // Get today's question
-        const questionQuery = `
-            SELECT id, question_text, category, question_date
-            FROM daily_questions
-            WHERE question_date = $1 AND is_active = true
-            LIMIT 1
-        `;
-        const questionResult = await pool.query(questionQuery, [today]);
-
-        if (questionResult.rows.length === 0) {
-            // If no question for today, get the latest available question
-            const fallbackQuery = `
-                SELECT id, question_text, category, question_date
-                FROM daily_questions
-                WHERE is_active = true
-                ORDER BY question_date DESC
-                LIMIT 1
-            `;
-            const fallbackResult = await pool.query(fallbackQuery);
-
-            if (fallbackResult.rows.length === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'No questions available',
-                    preview: true
-                });
-            }
-
-            const question = fallbackResult.rows[0];
-            return res.json({
-                success: true,
-                preview: true,
-                question: {
-                    id: question.id,
-                    text: question.question_text,
-                    category: question.category,
-                    date: question.question_date
-                },
-                message: "This is a preview! Login to answer and connect with your partner.",
-                requiresLogin: true
-            });
-        }
-
-        const question = questionResult.rows[0];
-
-        res.json({
-            success: true,
-            preview: true,
-            question: {
-                id: question.id,
-                text: question.question_text,
-                category: question.category,
-                date: question.question_date
-            },
-            message: "This is today's question! Login to answer and connect with your partner.",
-            requiresLogin: true
-        });
-
-    } catch (error) {
-        console.error('Error getting today\'s question preview:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to get question preview',
-            preview: true
-        });
-    }
-};
-
-// Get today's question (requires login)
+// Get today's question
 const getTodaysQuestion = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -268,13 +195,12 @@ const submitAnswer = async (req, res) => {
 
             // Create notification for partner
             const notificationQuery = `
-                INSERT INTO daily_notifications (user_id, notification_type, title, question_id, partner_id, message)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                INSERT INTO daily_notifications (user_id, notification_type, question_id, partner_id, message)
+                VALUES ($1, $2, $3, $4, $5)
             `;
             await pool.query(notificationQuery, [
                 partner.partner_id,
                 'partner_answered',
-                'Partner Answered Question',
                 questionId,
                 userId,
                 `${req.user.username} has answered today's question!`
@@ -375,13 +301,13 @@ const updateStreaksAndLoveMeter = async (userId, partnerId) => {
         if (streakMilestones.includes(stats.current_streak)) {
             const milestoneMessage = `🎉 Amazing! You've reached a ${stats.current_streak}-day streak!`;
             await pool.query(`
-                INSERT INTO daily_notifications (user_id, notification_type, title, partner_id, message)
-                VALUES ($1, $2, $3, $4, $5)
-            `, [userId, 'streak_milestone', 'Streak Milestone!', partnerId, milestoneMessage]);
+                INSERT INTO daily_notifications (user_id, notification_type, partner_id, message)
+                VALUES ($1, $2, $3, $4)
+            `, [userId, 'streak_milestone', partnerId, milestoneMessage]);
             await pool.query(`
-                INSERT INTO daily_notifications (user_id, notification_type, title, partner_id, message)
-                VALUES ($1, $2, $3, $4, $5)
-            `, [partnerId, 'streak_milestone', 'Streak Milestone!', userId, milestoneMessage]);
+                INSERT INTO daily_notifications (user_id, notification_type, partner_id, message)
+                VALUES ($1, $2, $3, $4)
+            `, [partnerId, 'streak_milestone', userId, milestoneMessage]);
         }
 
         // Check love meter milestones
@@ -389,13 +315,13 @@ const updateStreaksAndLoveMeter = async (userId, partnerId) => {
         if (loveMeterMilestones.includes(stats.total_points)) {
             const milestoneMessage = `💕 Your love meter reached ${stats.total_points} points!`;
             await pool.query(`
-                INSERT INTO daily_notifications (user_id, notification_type, title, partner_id, message)
-                VALUES ($1, $2, $3, $4, $5)
-            `, [userId, 'love_meter_milestone', 'Love Meter Milestone!', partnerId, milestoneMessage]);
+                INSERT INTO daily_notifications (user_id, notification_type, partner_id, message)
+                VALUES ($1, $2, $3, $4)
+            `, [userId, 'love_meter_milestone', partnerId, milestoneMessage]);
             await pool.query(`
-                INSERT INTO daily_notifications (user_id, notification_type, title, partner_id, message)
-                VALUES ($1, $2, $3, $4, $5)
-            `, [partnerId, 'love_meter_milestone', 'Love Meter Milestone!', userId, milestoneMessage]);
+                INSERT INTO daily_notifications (user_id, notification_type, partner_id, message)
+                VALUES ($1, $2, $3, $4)
+            `, [partnerId, 'love_meter_milestone', userId, milestoneMessage]);
         }
 
     } catch (error) {
@@ -910,7 +836,6 @@ const updateStreaks = async (userId, questionDate) => {
 
 module.exports = {
     getTodaysQuestion,
-    getTodaysQuestionPreview,
     submitAnswer,
     getUserStats,
     setCoupleName,
