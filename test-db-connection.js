@@ -28,8 +28,7 @@ const testConnection = async () => {
     if (isProduction || isSupabase || isRender) {
         console.log('🔒 Using SSL connection for production database');
         config.ssl = {
-            rejectUnauthorized: false,
-            sslmode: 'require'
+            rejectUnauthorized: false
         };
     } else {
         console.log('🔓 Using non-SSL connection for local development');
