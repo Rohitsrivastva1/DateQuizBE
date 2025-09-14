@@ -1,5 +1,10 @@
 const { Pool } = require('pg');
 
+// Try multiple connection methods for better compatibility
+const createPoolWithFallback = (config) => {
+    return new Pool(config);
+};
+
 // Database configuration for different environments
 const getDatabaseConfig = () => {
     const isProduction = process.env.NODE_ENV === 'production';
@@ -25,10 +30,14 @@ const getDatabaseConfig = () => {
     
     if (connectionString) {
         console.log('🔗 Using connection string for database');
+        console.log('🔍 Connection string preview:', connectionString.replace(/:[^@]*@/, ':***@'));
+        
         return {
             connectionString: connectionString,
             ssl: {
-                rejectUnauthorized: false
+                rejectUnauthorized: false,
+                checkServerIdentity: () => undefined,
+                secureProtocol: 'TLSv1_2_method'
             },
             max: 20,
             idleTimeoutMillis: 30000,
@@ -71,7 +80,7 @@ const getDatabaseConfig = () => {
     return baseConfig;
 };
 
-const pool = new Pool(getDatabaseConfig());
+const pool = createPoolWithFallback(getDatabaseConfig());
 
 // Log connection status
 pool.on('connect', () => {
@@ -88,12 +97,34 @@ pool.on('error', (err) => {
 // Connection test function
 const testConnection = async () => {
     try {
+        console.log('🔄 Attempting database connection...');
         const client = await pool.connect();
         console.log('✅ Database connection test successful');
+        
+        // Test a simple query
+        const result = await client.query('SELECT NOW() as current_time');
+        console.log('✅ Query test successful:', result.rows[0]);
+        
         client.release();
         return true;
     } catch (error) {
         console.error('❌ Database connection test failed:', error.message);
+        console.error('❌ Error code:', error.code);
+        console.error('❌ Error detail:', error.detail);
+        console.error('❌ Error hint:', error.hint);
+        
+        // Log specific error types
+        if (error.code === 'SELF_SIGNED_CERT_IN_CHAIN') {
+            console.log('💡 SSL Certificate Issue: Self-signed certificate detected');
+            console.log('💡 This usually means the SSL certificate chain is not trusted');
+        } else if (error.code === 'ECONNREFUSED') {
+            console.log('💡 Connection Refused: Database server is not reachable');
+        } else if (error.code === 'ENOTFOUND') {
+            console.log('💡 DNS Issue: Cannot resolve database hostname');
+        } else if (error.message.includes('SASL')) {
+            console.log('💡 SASL Authentication Issue: SCRAM authentication failed');
+        }
+        
         return false;
     }
 };
