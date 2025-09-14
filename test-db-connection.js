@@ -14,6 +14,7 @@ const testConnection = async () => {
     const isSupabase = (process.env.SUPABASE_DB_HOST || process.env.DB_HOST || '').includes('supabase.com');
     const isRender = (process.env.SUPABASE_DB_HOST || process.env.DB_HOST || '').includes('render.com');
 
+    // Use individual parameters with proper SSL config for Supabase
     const config = {
         host: process.env.SUPABASE_DB_HOST || process.env.DB_HOST || 'localhost',
         port: process.env.SUPABASE_DB_PORT || process.env.DB_PORT || 5432,
@@ -28,7 +29,9 @@ const testConnection = async () => {
     if (isProduction || isSupabase || isRender) {
         console.log('🔒 Using SSL connection for production database');
         config.ssl = {
-            rejectUnauthorized: false
+            rejectUnauthorized: false,
+            checkServerIdentity: () => undefined,
+            secureProtocol: 'TLSv1_2_method'
         };
     } else {
         console.log('🔓 Using non-SSL connection for local development');
