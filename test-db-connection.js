@@ -14,28 +14,21 @@ const testConnection = async () => {
     const isSupabase = (process.env.SUPABASE_DB_HOST || process.env.DB_HOST || '').includes('supabase.com');
     const isRender = (process.env.SUPABASE_DB_HOST || process.env.DB_HOST || '').includes('render.com');
 
-    // Use individual parameters with proper SSL config for Supabase
+    // Hardcoded Supabase configuration for testing
     const config = {
-        host: process.env.SUPABASE_DB_HOST || process.env.DB_HOST || 'localhost',
-        port: process.env.SUPABASE_DB_PORT || process.env.DB_PORT || 5432,
-        database: process.env.SUPABASE_DB_NAME || process.env.DB_NAME || 'datequiz',
-        user: process.env.SUPABASE_DB_USER || process.env.DB_USER || 'postgres',
-        password: process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD || '',
+        host: 'aws-0-ap-southeast-1.pooler.supabase.com',
+        port: 6543,
+        database: 'postgres',
+        user: 'postgres.epluqupenltlffznbmcx',
+        password: '9695700251@Rohit',
         connectionTimeoutMillis: 10000,
         acquireTimeoutMillis: 10000,
+        ssl: {
+            rejectUnauthorized: false
+        }
     };
-
-    // SSL configuration for production environments
-    if (isProduction || isSupabase || isRender) {
-        console.log('🔒 Using SSL connection for production database');
-        config.ssl = {
-            rejectUnauthorized: false,
-            checkServerIdentity: () => undefined,
-            secureProtocol: 'TLSv1_2_method'
-        };
-    } else {
-        console.log('🔓 Using non-SSL connection for local development');
-    }
+    
+    console.log('🔒 Using hardcoded Supabase configuration for testing');
 
     const pool = new Pool(config);
 
