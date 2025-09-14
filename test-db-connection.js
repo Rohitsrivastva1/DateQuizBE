@@ -7,6 +7,7 @@ console.log('DB Host:', process.env.DB_HOST || 'localhost');
 console.log('DB Port:', process.env.DB_PORT || 5432);
 console.log('DB Name:', process.env.DB_NAME || 'datequiz');
 console.log('DB User:', process.env.DB_USER || 'postgres');
+console.log('DB Password:', process.env.DB_PASSWORD ? '***' : 'not set');
 
 const testConnection = async () => {
     const isProduction = process.env.NODE_ENV === 'production';
@@ -25,13 +26,13 @@ const testConnection = async () => {
 
     // SSL configuration for production environments
     if (isProduction || isSupabase || isRender) {
-        console.log('🔒 Using SSL connection');
+        console.log('🔒 Using SSL connection for production database');
         config.ssl = {
             rejectUnauthorized: false,
             sslmode: 'require'
         };
     } else {
-        console.log('🔓 Using non-SSL connection');
+        console.log('🔓 Using non-SSL connection for local development');
     }
 
     const pool = new Pool(config);

@@ -18,11 +18,12 @@ const getDatabaseConfig = () => {
         allowExitOnIdle: true,
     };
 
-    // ✅ Proper SSL configuration
+    // ✅ Proper SSL configuration for production databases
     if (isProduction || isSupabase || isRender) {
-        console.log('✅ SSL configuration');
+        console.log('✅ SSL configuration for production database');
         baseConfig.ssl = {
-            rejectUnauthorized: false
+            rejectUnauthorized: false,
+            sslmode: 'require'
         };
     }
 
