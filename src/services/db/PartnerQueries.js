@@ -65,9 +65,10 @@ const disconnectPartners = async (user1_id, user2_id) => {
 }
 
 const createPartnerRequestNotification = async (receiver_id, requester_username) => {
-    const query = ` INSERT INTO daily_notifications (user_id, notification_type, message) VALUES ($1, 'partner_request', $2)`;
+    const query = ` INSERT INTO daily_notifications (user_id, notification_type, title, message) VALUES ($1, 'partner_request', $2, $3)`;
+    const title = 'Partner Request';
     const message = `${requester_username} sent you a partner request!`;
-    await db.query(query, [receiver_id, message]);
+    await db.query(query, [receiver_id, title, message]);
     
     // Send push notification
     try {
@@ -78,11 +79,12 @@ const createPartnerRequestNotification = async (receiver_id, requester_username)
 }
 
 const createPartnerResponseNotification = async (requester_id, receiver_username, response) => {
-    const query = ` INSERT INTO daily_notifications (user_id, notification_type, message) VALUES ($1, 'partner_response', $2)`;
-    const message = response === 'approved' 
+    const query = ` INSERT INTO daily_notifications (user_id, notification_type, title, message) VALUES ($1, 'partner_response', $2, $3)`;
+    const title = response === 'approved' ? 'Partner Request Accepted!' : 'Partner Request Declined';
+    const message = response === 'approved'
         ? `${receiver_username} accepted your partner request! You are now partners! 💕`
         : `${receiver_username} declined your partner request.`;
-    await db.query(query, [requester_id, message]);
+    await db.query(query, [requester_id, title, message]);
     
     // Send push notification
     try {

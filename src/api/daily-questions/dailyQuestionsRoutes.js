@@ -3,6 +3,7 @@ const router = express.Router();
 const { protect } = require('../../middleware/authmiddleware');
 const {
     getTodaysQuestion,
+    getTodaysQuestionPreview,
     submitAnswer,
     getUserStats,
     setCoupleName,
@@ -14,10 +15,13 @@ const {
     submitAnswerForQuestion
 } = require('./dailyQuestionsController');
 
-// All routes are protected with authentication
+// Public route - no login required
+router.get('/today-preview', getTodaysQuestionPreview); // Free question of the day
+
+// All other routes are protected with authentication
 router.use(protect);
 
-// Get today's question
+// Get today's question (full access)
 router.get('/today', getTodaysQuestion);
 
 // Submit answer to today's question

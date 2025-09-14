@@ -2,6 +2,23 @@ const partnerTurnQueries = require('../../services/db/partnerTurnQueries');
 const packQueries = require('../../services/db/packQueries');
 const db = require('../../config/db'); // Added db import
 
+// Helper function to send SSE notifications
+const sendSSENotification = (type, data) => {
+    try {
+        // Get the app instance to access SSE connections
+        const { sendNotificationToAll } = require('../../../server');
+        if (sendNotificationToAll) {
+            sendNotificationToAll({
+                type: type,
+                timestamp: new Date().toISOString(),
+                ...data
+            });
+        }
+    } catch (error) {
+        console.error('Error sending SSE notification:', error);
+    }
+};
+
 // Start a new partner turn
 const startPartnerTurn = async (req, res) => {
     const { deckId, questionId } = req.body;
@@ -31,6 +48,15 @@ const startPartnerTurn = async (req, res) => {
             userId, 
             userPartner.partner_id
         );
+
+        // Send SSE notification to partner
+        sendSSENotification('partner_turn_update', {
+            turnId: partnerTurn.id,
+            questionId: questionId,
+            deckId: deckId,
+            partnerId: userPartner.partner_id,
+            action: 'started'
+        });
 
         res.status(201).json({
             message: 'Partner turn started successfully',
@@ -94,6 +120,24 @@ const submitPartnerAnswer = async (req, res) => {
 
         const isComplete = answers[partnerTurn.requester_id] && answers[partnerTurn.receiver_id];
 
+        // Send SSE notification to partner
+        const partnerId = partnerTurn.requester_id === userId ? partnerTurn.receiver_id : partnerTurn.requester_id;
+        sendSSENotification('partner_turn_update', {
+            turnId: turnId,
+            questionId: partnerTurn.question_id,
+            deckId: partnerTurn.deck_id,
+            partnerId: partnerId,
+            action: 'answered',
+            isComplete: isComplete,
+            questionText: partnerTurn.question_text,
+            deckName: partnerTurn.deck_name
+        });
+
+        // Send general notification update
+        sendSSENotification('notification', {
+            count: await getNotificationCount(partnerId)
+        });
+
         res.json({
             message: 'Answer submitted successfully',
             turnId: turnId,
@@ -101,7 +145,7 @@ const submitPartnerAnswer = async (req, res) => {
             status: updatedTurn.status,
             questionText: partnerTurn.question_text,
             deckName: partnerTurn.deck_name,
-            partnerId: partnerTurn.requester_id === userId ? partnerTurn.receiver_id : partnerTurn.requester_id
+            partnerId: partnerId
         });
 
     } catch (error) {
@@ -109,6 +153,17 @@ const submitPartnerAnswer = async (req, res) => {
         res.status(500).json({ 
             message: 'Failed to submit answer' 
         });
+    }
+};
+
+// Helper function to get notification count for a user
+const getNotificationCount = async (userId) => {
+    try {
+        const unreadTurns = await partnerTurnQueries.getUnreadPartnerTurns(userId);
+        return unreadTurns.length;
+    } catch (error) {
+        console.error('Error getting notification count:', error);
+        return 0;
     }
 };
 

@@ -59,6 +59,97 @@ app.get('/health', async (req, res) => {
     }
 });
 
+// Public info endpoint - no login required
+app.get('/api/public/info', (req, res) => {
+    res.json({
+        appName: 'DateQuiz',
+        version: '1.0.0',
+        features: {
+            freePreview: true,
+            premiumQuestions: true,
+            partnerConnection: true,
+            dailyQuestions: true
+        },
+        message: "Welcome to DateQuiz! Login to unlock all features and connect with your partner."
+    });
+});
+
+// SSE endpoint for real-time notifications
+app.get('/api/notifications/stream', (req, res) => {
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+    });
+
+    // Send initial connection message
+    res.write('data: {"type": "connected", "message": "SSE connection established"}\n\n');
+
+    // Store connection for later use
+    req.app.locals.sseConnections = req.app.locals.sseConnections || [];
+    req.app.locals.sseConnections.push(res);
+
+    // Handle client disconnect
+    req.on('close', () => {
+        const index = req.app.locals.sseConnections.indexOf(res);
+        if (index > -1) {
+            req.app.locals.sseConnections.splice(index, 1);
+        }
+        console.log(`SSE client disconnected. Active connections: ${req.app.locals.sseConnections.length}`);
+    });
+
+    // Send heartbeat every 30 seconds to keep connection alive
+    const heartbeat = setInterval(() => {
+        if (req.app.locals.sseConnections.includes(res)) {
+            res.write('data: {"type": "heartbeat", "timestamp": "' + new Date().toISOString() + '"}\n\n');
+        } else {
+            clearInterval(heartbeat);
+        }
+    }, 30000);
+
+    console.log(`SSE client connected. Active connections: ${req.app.locals.sseConnections.length}`);
+});
+
+// Test endpoint to manually trigger SSE notifications
+app.post('/api/notifications/test', (req, res) => {
+    try {
+        const { type, data } = req.body;
+        
+        if (!type) {
+            return res.status(400).json({ error: 'Notification type is required' });
+        }
+
+        const notificationData = {
+            type: type,
+            timestamp: new Date().toISOString(),
+            ...data
+        };
+
+        // Send to all connected SSE clients
+        if (req.app.locals.sseConnections) {
+            req.app.locals.sseConnections.forEach(connection => {
+                try {
+                    connection.write(`data: ${JSON.stringify(notificationData)}\n\n`);
+                } catch (error) {
+                    console.error('Error sending test SSE notification:', error);
+                }
+            });
+        }
+
+        res.json({ 
+            message: 'Test notification sent', 
+            sentTo: req.app.locals.sseConnections?.length || 0,
+            data: notificationData
+        });
+
+    } catch (error) {
+        console.error('Error sending test notification:', error);
+        res.status(500).json({ error: 'Failed to send test notification' });
+    }
+});
+
 // API routes
 app.use('/api/auth', require('./src/api/auth/authRoutes'));
 app.use('/api/packs', require('./src/api/packs/packRoutes'));
@@ -97,22 +188,25 @@ const startServer = async () => {
         app.listen(PORT, HOST, () => {
             console.log(`Server running on ${HOST}:${PORT}`);
             console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`SSE endpoint available at: ${HOST}:${PORT}/api/notifications/stream`);
         });
     } catch (error) {
-        console.error('❌ Error starting server:', error);
+        console.error('Failed to start server:', error);
         process.exit(1);
     }
 };
 
 startServer();
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-    console.log('SIGTERM received, shutting down gracefully');
-    process.exit(0);
-});
-
-process.on('SIGINT', () => {
-    console.log('SIGINT received, shutting down gracefully');
-    process.exit(0);
-});
+// Export the app and sendNotificationToAll function for use in other modules
+module.exports = { app, sendNotificationToAll: (data) => {
+    if (app.locals.sseConnections) {
+        app.locals.sseConnections.forEach(connection => {
+            try {
+                connection.write(`data: ${JSON.stringify(data)}\n\n`);
+            } catch (error) {
+                console.error('Error sending SSE notification:', error);
+            }
+        });
+    }
+}};
