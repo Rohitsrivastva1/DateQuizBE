@@ -21,17 +21,8 @@ module.exports = {
         host: process.env.HOST || '0.0.0.0',
         cors: {
             origin: [
-                'http://localhost:3000',
-                'http://localhost:19006',
-                'http://192.168.31.53:3000',
-                'http://192.168.31.53:19006',
-                'exp://192.168.31.53:19000',
-                'exp://localhost:19000',
-                'http://localhost:8081',
-                'http://192.168.31.53:8081',
-                'http://localhost:19000',
-                'http://192.168.31.53:19000',
-                '*'
+                process.env.FRONTEND_URL || 'http://localhost:3000',
+                process.env.MOBILE_APP_URL || 'http://localhost:19006'
             ],
             credentials: true,
             methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

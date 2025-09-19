@@ -4,13 +4,13 @@ const { Pool } = require('pg');
 const getDatabaseConfig = () => {
     const isProduction = process.env.NODE_ENV === 'production';
     
-    // Hardcoded Supabase configuration for testing
+    // Use environment variables for database configuration
     return {
-        host: 'aws-0-ap-southeast-1.pooler.supabase.com',
-        port: 6543,
-        database: 'postgres',
-        user: 'postgres.epluqupenltlffznbmcx',
-        password: '9695700251@Rohit',
+        host: process.env.DB_HOST || process.env.SUPABASE_DB_HOST || 'aws-0-ap-southeast-1.pooler.supabase.com',
+        port: parseInt(process.env.DB_PORT || process.env.SUPABASE_DB_PORT || '6543'),
+        database: process.env.DB_NAME || process.env.SUPABASE_DB_NAME || 'postgres',
+        user: process.env.DB_USER || process.env.SUPABASE_DB_USER || 'postgres.epluqupenltlffznbmcx',
+        password: process.env.DB_PASSWORD || process.env.SUPABASE_DB_PASSWORD || '9695700251@Rohit',
         ssl: { rejectUnauthorized: false },
         max: 20,
         idleTimeoutMillis: 30000,

@@ -14,6 +14,11 @@ const protect = async (req, res, next) => {
       token = authHeader.split(' ')[1];
       console.log('Token extracted:', token ? 'Present' : 'Missing');
 
+      if (!token) {
+        console.log('No token provided');
+        return res.status(401).json({ message: 'Not authorized, no token' });
+      }
+
       // Verify token
       const decoded = tokenService.verifyToken(token);
       console.log('Token decoded:', decoded ? 'Success' : 'Failed');
@@ -35,9 +40,7 @@ const protect = async (req, res, next) => {
       console.error('Auth middleware error:', error);
       return res.status(401).json({ message: 'Not authorized, token failed' });
     }
-  }
-
-  if (!token) {
+  } else {
     console.log('No token provided');
     return res.status(401).json({ message: 'Not authorized, no token' });
   }
