@@ -11,21 +11,23 @@ services:
       - key: PORT
         value: 10000
       - key: SUPABASE_DB_HOST
-        sync: false
+        value: aws-0-ap-southeast-1.pooler.supabase.com
       - key: SUPABASE_DB_PORT
-        value: 5432
+        value: 6543
       - key: SUPABASE_DB_NAME
-        sync: false
+        value: postgres
       - key: SUPABASE_DB_USER
-        sync: false
+        value: postgres.epluqupenltlffznbmcx
       - key: SUPABASE_DB_PASSWORD
-        sync: false
-      - key: SUPABASE_DB_CA
-        sync: false
+        value: 9695700251@Rohit
       - key: JWT_SECRET
         generateValue: true
       - key: FRONTEND_URL
         value: https://your-frontend-app.onrender.com
+      - key: EMAIL_USER
+        value: schoolabe10@gmail.com
+      - key: EMAIL_PASS
+        value: ejmv hrau cogi qqxx
 
 databases:
   - name: datequiz-db
