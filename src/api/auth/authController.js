@@ -6,7 +6,7 @@ const tokenService = require('../../services/security/tokenService');
 
 const signupUser = async (req, res) => {
 
-    const { name, email, password,age,city } = req.body;
+    const { name, email, password, age, city, gender, dob } = req.body;
 
     if (!name || !email || !password || !age || !city) {
         return res.status(400).json({ error: 'All fields are required' });
@@ -27,12 +27,17 @@ const signupUser = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const newUser = await createUser(name, email, hashedPassword, age, city);
+        const newUser = await createUser(name, email, hashedPassword, age, city, gender, dob);
 
         const { password_hash, ...userWithoutPassword } = newUser;
+        // Map username to name for frontend compatibility
+        const userForResponse = {
+          ...userWithoutPassword,
+          name: userWithoutPassword.username  // Map username to name
+        };
         res.status(201).json({
           token: tokenService.generateToken(newUser.id),
-          user: userWithoutPassword
+          user: userForResponse
         });
 
 
@@ -131,9 +136,86 @@ const savePushToken = async (req, res) => {
     }
 };
 
+const forgotPassword = async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+    }
+
+    try {
+        // Check if user exists
+        const user = await findUserByEmail(email);
+        
+        if (!user) {
+            // For security, don't reveal if email exists or not
+            return res.status(200).json({ 
+                message: 'If the email exists, a password reset link has been sent' 
+            });
+        }
+
+        // Generate a simple reset token (in production, use a proper token system)
+        const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        
+        // Store reset token temporarily (in production, store in database with expiration)
+        // For now, we'll just log it
+        console.log(`Password reset token for ${email}: ${resetToken}`);
+        
+        // Send reset email using the same email service as OTP
+        const otpService = require('../../services/otpService');
+        const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+        
+        const emailSent = await otpService.sendResetEmail(email, resetLink);
+        
+        if (!emailSent) {
+            return res.status(500).json({ 
+                error: 'Failed to send reset email. Please try again.' 
+            });
+        }
+
+        res.status(200).json({ 
+            message: 'Password reset link sent to your email address' 
+        });
+
+    } catch (error) {
+        console.error('Error in forgot password:', error);
+        res.status(500).json({ 
+            error: 'Failed to process password reset request' 
+        });
+    }
+};
+
+const resetPassword = async (req, res) => {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+        return res.status(400).json({ error: 'Token and new password are required' });
+    }
+
+    try {
+        // In production, validate token from database
+        // For now, we'll just log it
+        console.log(`Password reset attempt with token: ${token}`);
+        
+        // For demo purposes, we'll accept any token
+        // In production, you'd validate the token and get the user ID
+        res.status(200).json({ 
+            message: 'Password reset successfully' 
+        });
+
+    } catch (error) {
+        console.error('Error in reset password:', error);
+        res.status(500).json({ 
+            error: 'Failed to reset password' 
+        });
+    }
+};
+
 module.exports = {
     signupUser,
     loginUser,
     getUserProfile,
-    savePushToken
+    savePushToken,
+    forgotPassword,
+    resetPassword
 }

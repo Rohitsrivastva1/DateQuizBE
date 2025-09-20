@@ -26,7 +26,13 @@ module.exports = {
                 'http://localhost:8081',
                 'http://192.168.31.53:8081',
                 'http://localhost:19000',
-                'http://192.168.31.53:19000'
+                'http://192.168.31.53:19000',
+                // Android emulator access
+                'http://10.0.2.2:3000',
+                'http://10.0.2.2:19006',
+                'http://10.0.2.2:8081',
+                'http://10.0.2.2:19000',
+                'exp://10.0.2.2:19000'
             ],
             credentials: true,
             methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

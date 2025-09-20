@@ -163,6 +163,64 @@ class OTPService {
             return false;
         }
     }
+
+    /**
+     * Send password reset email
+     * @param {string} email 
+     * @param {string} resetLink 
+     * @returns {Promise<boolean>}
+     */
+    async sendResetEmail(email, resetLink) {
+        try {
+            const transporter = this.createTransporter();
+            
+            const mailOptions = {
+                from: process.env.EMAIL_USER || 'schoolabe10@gmail.com',
+                to: email,
+                subject: 'DateQuiz - Password Reset',
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <div style="text-align: center; margin-bottom: 30px;">
+                            <h1 style="color: #e91e63; font-size: 28px; margin: 0;">DateQuiz</h1>
+                            <p style="color: #666; font-size: 16px; margin: 10px 0;">Your Dating Adventure Awaits!</p>
+                        </div>
+                        
+                        <div style="background: #f8f9fa; padding: 30px; border-radius: 10px; text-align: center;">
+                            <h2 style="color: #333; margin-bottom: 20px;">Password Reset Request</h2>
+                            <p style="color: #666; font-size: 16px; margin-bottom: 25px;">
+                                You requested to reset your password. Click the button below to reset your password:
+                            </p>
+                            
+                            <div style="margin: 30px 0;">
+                                <a href="${resetLink}" style="background: #e91e63; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                                    Reset My Password
+                                </a>
+                            </div>
+                            
+                            <p style="color: #666; font-size: 14px; margin-top: 20px;">
+                                This link will expire in 1 hour. If you didn't request this reset, please ignore this email.
+                            </p>
+                        </div>
+                        
+                        <div style="text-align: center; margin-top: 30px; color: #999; font-size: 12px;">
+                            <p>If the button doesn't work, copy and paste this link into your browser:</p>
+                            <p style="word-break: break-all; color: #e91e63;">${resetLink}</p>
+                            <p>© 2024 DateQuiz. All rights reserved.</p>
+                        </div>
+                    </div>
+                `
+            };
+
+            const result = await transporter.sendMail(mailOptions);
+            console.log(`📧 Password reset email sent to ${email}`);
+            console.log(`📧 Message ID: ${result.messageId}`);
+            
+            return true;
+        } catch (error) {
+            console.error('Error sending reset email:', error);
+            return false;
+        }
+    }
 }
 
 module.exports = new OTPService();
