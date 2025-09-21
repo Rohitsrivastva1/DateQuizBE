@@ -33,13 +33,25 @@ async function migrate() {
         console.log('Environment:', process.env.NODE_ENV || 'development');
         console.log('DB Host:', baseConfig.host);
 
-        // Read SQL files
-        const schemaSQL = fs.readFileSync('./partner_turn_schema.sql', 'utf8');
+        // Read SQL files in correct order
+        const coreSchemaSQL = fs.readFileSync('./core_schema.sql', 'utf8');
+        const partnerTurnSchemaSQL = fs.readFileSync('./partner_turn_schema.sql', 'utf8');
+        const dailyQuestionsSchemaSQL = fs.readFileSync('./daily_questions_schema.sql', 'utf8');
+        const adminSchemaSQL = fs.readFileSync('./admin_schema.sql', 'utf8');
         const dataSQL = fs.readFileSync('./partner_decks_data.sql', 'utf8');
 
-        // Execute schema
-        console.log('Creating schema...');
-        await pool.query(schemaSQL);
+        // Execute schemas in order (core tables first, then dependent tables)
+        console.log('Creating core schema...');
+        await pool.query(coreSchemaSQL);
+
+        console.log('Creating partner turn schema...');
+        await pool.query(partnerTurnSchemaSQL);
+
+        console.log('Creating daily questions schema...');
+        await pool.query(dailyQuestionsSchemaSQL);
+
+        console.log('Creating admin schema...');
+        await pool.query(adminSchemaSQL);
 
         // Execute data
         console.log('Inserting initial data...');

@@ -66,6 +66,9 @@ app.use('/api/partner', require('./src/api/partner/partnerRoutes'));
 app.use('/api/partner-turn', require('./src/api/partner/partnerTurnRoutes'));
 app.use('/api/daily-questions', require('./src/api/daily-questions/dailyQuestionsRoutes'));
 
+// Admin API routes
+app.use('/api/admin', require('./src/api/admin/adminRoutes'));
+
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error('Error:', err);
