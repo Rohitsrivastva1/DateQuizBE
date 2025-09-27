@@ -142,7 +142,7 @@ class WebSocketService {
       try {
         // Decode JWT token to get user ID
         const jwt = require('jsonwebtoken');
-        const decoded = jwt.verify(message.token, process.env.JWT_SECRET || 'your-secret-key');
+        const decoded = jwt.verify(message.token, process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production');
         
         client.userId = decoded.id;
         client.authenticated = true;
