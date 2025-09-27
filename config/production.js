@@ -33,7 +33,7 @@ module.exports = {
     // JWT configuration
     jwt: {
         secret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
-        expiresIn: '7d'
+        expiresIn: '30d' // Extended to 30 days
     },
     
     // Logging

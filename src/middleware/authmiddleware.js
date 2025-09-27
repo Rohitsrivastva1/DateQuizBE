@@ -35,6 +35,16 @@ const protect = async (req, res, next) => {
         return res.status(401).json({ message: 'Not authorized, user not found' });
       }
 
+      // Check if token is expiring soon and refresh it
+      if (tokenService.isTokenExpiringSoon(token)) {
+        console.log('Token expiring soon, refreshing...');
+        const newToken = tokenService.refreshToken(decoded.id);
+        
+        // Add new token to response headers
+        res.setHeader('X-New-Token', newToken);
+        console.log('New token generated and sent in headers');
+      }
+
       next();
     } catch (error) {
       console.error('Auth middleware error:', error);
