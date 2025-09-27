@@ -1,0 +1,61 @@
+{
+  "passed": 10,
+  "failed": 1,
+  "tests": [
+    {
+      "name": "Server Health Check",
+      "success": true,
+      "details": "Server is running on port development"
+    },
+    {
+      "name": "User Login",
+      "success": true,
+      "details": "Logged in as Rohit"
+    },
+    {
+      "name": "Get User Info",
+      "success": true,
+      "details": "User: Rohit, Couple ID: 10"
+    },
+    {
+      "name": "Journal Creation",
+      "success": true,
+      "details": "Created journal for 2025-09-27"
+    },
+    {
+      "name": "Calendar Data",
+      "success": true,
+      "details": "Retrieved calendar for 2025-9, 1 days"
+    },
+    {
+      "name": "Message Sending",
+      "success": true,
+      "details": "Sent message: \"Test message sent successfully\""
+    },
+    {
+      "name": "Message Retrieval",
+      "success": true,
+      "details": "Retrieved 0 messages"
+    },
+    {
+      "name": "Add Reaction",
+      "success": false,
+      "details": "Failed: Validation failed"
+    },
+    {
+      "name": "Journal Statistics",
+      "success": true,
+      "details": "Journals: undefined, Messages: undefined, Streak: undefined"
+    },
+    {
+      "name": "WebSocket Info",
+      "success": true,
+      "details": "WebSocket available at /ws"
+    },
+    {
+      "name": "File Upload",
+      "success": true,
+      "details": "File upload endpoint available (mock test)"
+    }
+  ]
+}
