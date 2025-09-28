@@ -195,14 +195,13 @@ const submitAnswer = async (req, res) => {
 
             // Create notification for partner
             const notificationQuery = `
-                INSERT INTO daily_notifications (user_id, notification_type, question_id, partner_id, message)
-                VALUES ($1, $2, $3, $4, $5)
+                INSERT INTO daily_notifications (user_id, notification_type, title, message)
+                VALUES ($1, $2, $3, $4)
             `;
             await pool.query(notificationQuery, [
                 partner.partner_id,
                 'partner_answered',
-                questionId,
-                userId,
+                'Partner Answered Question',
                 `${req.user.username} has answered today's question!`
             ]);
 
@@ -210,18 +209,22 @@ const submitAnswer = async (req, res) => {
             if (bothAnswered) {
                 // Create reveal notification for both users
                 const revealMessage = 'Both partners have answered! Tap to reveal your answers.';
-                await pool.query(notificationQuery, [
+                await pool.query(`
+                    INSERT INTO daily_notifications (user_id, notification_type, title, message)
+                    VALUES ($1, $2, $3, $4)
+                `, [
                     userId,
                     'answers_revealed',
-                    questionId,
-                    partner.partner_id,
+                    'Answers Revealed!',
                     revealMessage
                 ]);
-                await pool.query(notificationQuery, [
+                await pool.query(`
+                    INSERT INTO daily_notifications (user_id, notification_type, title, message)
+                    VALUES ($1, $2, $3, $4)
+                `, [
                     partner.partner_id,
                     'answers_revealed',
-                    questionId,
-                    userId,
+                    'Answers Revealed!',
                     revealMessage
                 ]);
 
@@ -254,44 +257,43 @@ const updateStreaksAndLoveMeter = async (userId, partnerId) => {
 
         // Update streaks
         const streakQuery = `
-            INSERT INTO user_streaks (user_id, partner_id, current_streak, longest_streak, last_answered_date)
-            VALUES ($1, $2, 1, 1, $3)
-            ON CONFLICT (user_id, partner_id) 
+            INSERT INTO user_streaks (user_id, current_streak, longest_streak, last_answered_date)
+            VALUES ($1, 1, 1, $2)
+            ON CONFLICT (user_id) 
             DO UPDATE SET 
                 current_streak = CASE 
-                    WHEN user_streaks.last_answered_date = $3 - INTERVAL '1 day' 
+                    WHEN user_streaks.last_answered_date = $2 - INTERVAL '1 day' 
                     THEN user_streaks.current_streak + 1 
                     ELSE 1 
                 END,
                 longest_streak = CASE 
-                    WHEN user_streaks.last_answered_date = $3 - INTERVAL '1 day' 
+                    WHEN user_streaks.last_answered_date = $2 - INTERVAL '1 day' 
                     THEN GREATEST(user_streaks.longest_streak, user_streaks.current_streak + 1)
                     ELSE GREATEST(user_streaks.longest_streak, 1)
                 END,
-                last_answered_date = $3
+                last_answered_date = $2
         `;
-        await pool.query(streakQuery, [userId, partnerId, today]);
-        await pool.query(streakQuery, [partnerId, userId, today]);
+        await pool.query(streakQuery, [userId, today]);
+        await pool.query(streakQuery, [partnerId, today]);
 
         // Update love meter
         const loveMeterQuery = `
-            INSERT INTO love_meters (user_id, partner_id, current_level, total_points, questions_answered_together)
-            VALUES ($1, $2, 1, 10, 1)
+            INSERT INTO love_meters (user_id, partner_id, love_score, questions_answered)
+            VALUES ($1, $2, 10, 1)
             ON CONFLICT (user_id, partner_id) 
             DO UPDATE SET 
-                total_points = love_meters.total_points + 10,
-                questions_answered_together = love_meters.questions_answered_together + 1,
-                current_level = (love_meters.total_points + 10) / 100 + 1
+                love_score = love_meters.love_score + 10,
+                questions_answered = love_meters.questions_answered + 1
         `;
         await pool.query(loveMeterQuery, [userId, partnerId]);
         await pool.query(loveMeterQuery, [partnerId, userId]);
 
         // Check for milestones
         const milestoneQuery = `
-            SELECT current_streak, longest_streak, total_points, questions_answered_together
+            SELECT us.current_streak, us.longest_streak, lm.love_score, lm.questions_answered
             FROM user_streaks us
-            LEFT JOIN love_meters lm ON us.user_id = lm.user_id AND us.partner_id = lm.partner_id
-            WHERE us.user_id = $1 AND us.partner_id = $2
+            LEFT JOIN love_meters lm ON us.user_id = lm.user_id AND lm.partner_id = $2
+            WHERE us.user_id = $1
         `;
         const milestoneResult = await pool.query(milestoneQuery, [userId, partnerId]);
         const stats = milestoneResult.rows[0];
@@ -301,27 +303,27 @@ const updateStreaksAndLoveMeter = async (userId, partnerId) => {
         if (streakMilestones.includes(stats.current_streak)) {
             const milestoneMessage = `🎉 Amazing! You've reached a ${stats.current_streak}-day streak!`;
             await pool.query(`
-                INSERT INTO daily_notifications (user_id, notification_type, partner_id, message)
+                INSERT INTO daily_notifications (user_id, notification_type, title, message)
                 VALUES ($1, $2, $3, $4)
-            `, [userId, 'streak_milestone', partnerId, milestoneMessage]);
+            `, [userId, 'streak_milestone', 'Streak Milestone!', milestoneMessage]);
             await pool.query(`
-                INSERT INTO daily_notifications (user_id, notification_type, partner_id, message)
+                INSERT INTO daily_notifications (user_id, notification_type, title, message)
                 VALUES ($1, $2, $3, $4)
-            `, [partnerId, 'streak_milestone', userId, milestoneMessage]);
+            `, [partnerId, 'streak_milestone', 'Streak Milestone!', milestoneMessage]);
         }
 
         // Check love meter milestones
         const loveMeterMilestones = [50, 100, 200, 500];
-        if (loveMeterMilestones.includes(stats.total_points)) {
-            const milestoneMessage = `💕 Your love meter reached ${stats.total_points} points!`;
+        if (loveMeterMilestones.includes(stats.love_score)) {
+            const milestoneMessage = `💕 Your love meter reached ${stats.love_score} points!`;
             await pool.query(`
-                INSERT INTO daily_notifications (user_id, notification_type, partner_id, message)
+                INSERT INTO daily_notifications (user_id, notification_type, title, message)
                 VALUES ($1, $2, $3, $4)
-            `, [userId, 'love_meter_milestone', partnerId, milestoneMessage]);
+            `, [userId, 'love_meter_milestone', 'Love Meter Milestone!', milestoneMessage]);
             await pool.query(`
-                INSERT INTO daily_notifications (user_id, notification_type, partner_id, message)
+                INSERT INTO daily_notifications (user_id, notification_type, title, message)
                 VALUES ($1, $2, $3, $4)
-            `, [partnerId, 'love_meter_milestone', userId, milestoneMessage]);
+            `, [partnerId, 'love_meter_milestone', 'Love Meter Milestone!', milestoneMessage]);
         }
 
     } catch (error) {
@@ -417,6 +419,55 @@ const getUserStats = async (req, res) => {
         res.status(500).json({ 
             success: false, 
             message: 'Internal server error' 
+        });
+    }
+};
+
+// Get couple name
+const getCoupleName = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Get partner info first
+        const partnerQuery = `
+            SELECT 
+                CASE 
+                    WHEN pr.requester_id = $1 THEN pr.receiver_id
+                    ELSE pr.requester_id
+                END as partner_id
+            FROM partner_requests pr
+            WHERE (pr.requester_id = $1 OR pr.receiver_id = $1) AND pr.status = 'approved'
+        `;
+        const partnerResult = await pool.query(partnerQuery, [userId]);
+        
+        if (partnerResult.rows.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'No partner found' 
+            });
+        }
+
+        const partnerId = partnerResult.rows[0].partner_id;
+
+        // Get couple name from couple_names table
+        const coupleQuery = `
+            SELECT couple_name
+            FROM couple_names
+            WHERE (user_id = $1 AND partner_id = $2) OR (user_id = $2 AND partner_id = $1)
+        `;
+        const coupleResult = await pool.query(coupleQuery, [userId, partnerId]);
+        
+        const coupleName = coupleResult.rows.length > 0 ? coupleResult.rows[0].couple_name : null;
+
+        res.json({
+            success: true,
+            coupleName: coupleName
+        });
+    } catch (error) {
+        console.error('Error getting couple name:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to get couple name' 
         });
     }
 };
@@ -838,6 +889,7 @@ module.exports = {
     getTodaysQuestion,
     submitAnswer,
     getUserStats,
+    getCoupleName,
     setCoupleName,
     getNotifications,
     markNotificationRead,

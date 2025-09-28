@@ -5,6 +5,7 @@ const {
     getTodaysQuestion,
     submitAnswer,
     getUserStats,
+    getCoupleName,
     setCoupleName,
     getNotifications,
     markNotificationRead,
@@ -25,6 +26,9 @@ router.post('/answer', submitAnswer);
 
 // Get user stats (streaks and love meter)
 router.get('/stats', getUserStats);
+
+// Get couple name
+router.get('/couple-name', getCoupleName);
 
 // Set couple name
 router.post('/couple-name', setCoupleName);

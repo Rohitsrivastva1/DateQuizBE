@@ -13,6 +13,7 @@ const partnerRoutes = require('./api/partner/partnerRoutes');
 const packRoutes = require('./api/packs/packRoutes');
 const journalRoutes = require('./api/journal/journalRoutes');
 const mediaRoutes = require('./api/journal/mediaRoutes');
+const dailyQuestionsRoutes = require('./api/daily-questions/dailyQuestionsRoutes');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -83,6 +84,7 @@ app.use('/api/partner', partnerRoutes);
 app.use('/api/packs', packRoutes);
 app.use('/api/journal', journalRoutes);
 app.use('/api/journal', mediaRoutes);
+app.use('/api/daily-questions', dailyQuestionsRoutes);
 
 // WebSocket endpoint info
 app.get('/ws-info', (req, res) => {
