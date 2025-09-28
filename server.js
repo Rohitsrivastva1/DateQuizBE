@@ -65,6 +65,8 @@ app.use('/api/packs', require('./src/api/packs/packRoutes'));
 app.use('/api/partner', require('./src/api/partner/partnerRoutes'));
 app.use('/api/partner-turn', require('./src/api/partner/partnerTurnRoutes'));
 app.use('/api/daily-questions', require('./src/api/daily-questions/dailyQuestionsRoutes'));
+app.use('/api/journal', require('./src/api/journal/journalRoutes'));
+app.use('/api/journal', require('./src/api/journal/mediaRoutes'));
 
 // Admin API routes
 app.use('/api/admin', require('./src/api/admin/adminRoutes'));
