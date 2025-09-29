@@ -14,7 +14,7 @@ const createOrGetJournal = async (req, res) => {
     }
 
     const { coupleId, date } = req.params;
-    const { theme, isPrivate, unlockDate } = req.body;
+    const { theme, isPrivate, unlockDate, content, location, weather } = req.body;
 
     // Check if user is part of the couple
     const isAuthorized = await journalQueries.isUserInCouple(req.user.id, coupleId);
@@ -25,24 +25,49 @@ const createOrGetJournal = async (req, res) => {
       });
     }
 
-    // Try to get existing journal
-    let journal = await journalQueries.getJournalByDate(req.user.id, date);
+    // Always create a new journal entry (allow multiple entries per date)
+    console.log('Creating journal with date:', date, 'for user:', req.user.id);
     
-    if (!journal) {
-      // Create new journal
-      journal = await journalQueries.createJournal({
-        userId: req.user.id,
-        partnerId: coupleId,
-        date,
-        theme: theme || 'default',
-        isPrivate: isPrivate || false,
-        unlockDate
-      });
+    // Ensure the date is properly formatted for the database
+    const journalDate = new Date(date + 'T00:00:00.000Z');
+    console.log('Formatted journal date:', journalDate.toISOString());
+    
+    const journal = await journalQueries.createJournal({
+      userId: req.user.id,
+      partnerId: coupleId,
+      date: journalDate.toISOString(),
+      theme: theme || 'default',
+      isPrivate: isPrivate || false,
+      unlockDate
+    });
+    console.log('Created journal:', journal);
+
+    // If content is provided, save it as a message
+    console.log('Journal content received:', { content, hasContent: !!(content && content.trim()) });
+    if (content && content.trim()) {
+      const messageData = {
+        journalId: journal.journal_id,
+        senderId: req.user.id,
+        type: 'text',
+        content: content.trim(),
+        mediaMetadata: {
+          location: location || '',
+          weather: weather || '',
+          created_at: new Date().toISOString()
+        }
+      };
+      
+      console.log('Creating message with data:', messageData);
+      const message = await journalQueries.createMessage(messageData);
+      console.log('Message created:', message);
     }
+
+    // Get the updated journal with content
+    const journalEntries = await journalQueries.getJournalByDate(req.user.id, date);
 
     res.json({
       success: true,
-      data: journal
+      data: journalEntries
     });
   } catch (error) {
     console.error('Error creating/getting journal:', error);
@@ -70,18 +95,29 @@ const getJournalByDate = async (req, res) => {
       });
     }
 
-    const journal = await journalQueries.getJournalByDate(req.user.id, date);
+    console.log('Getting journal for date:', date, 'user:', req.user.id);
     
-    if (!journal) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Journal not found' 
+    // Handle date format - if it's YYYY-MM-DD, convert to proper date range
+    let queryDate = date;
+    if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      // Convert YYYY-MM-DD to start of day in UTC
+      queryDate = new Date(date + 'T00:00:00.000Z').toISOString();
+    }
+    console.log('Query date:', queryDate);
+    
+    const journalEntries = await journalQueries.getJournalByDate(req.user.id, queryDate);
+    console.log('Found journal entries:', journalEntries);
+    
+    if (!journalEntries || journalEntries.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Journal not found'
       });
     }
 
     res.json({
       success: true,
-      data: journal
+      data: journalEntries
     });
   } catch (error) {
     console.error('Error getting journal:', error);

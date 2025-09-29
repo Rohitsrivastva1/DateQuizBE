@@ -1,5 +1,5 @@
 const { query } = require('../../config/db');
-const { createUser, findUserByUsername, findUserByEmail } = require('../../services/db/userQueries');
+const { createUser, findUserByUsername, findUserByEmail, findUserById, updateUserPassword } = require('../../services/db/userQueries');
 const pushNotificationService = require('../../services/pushNotificationService');
 const bcrypt = require('bcryptjs');
 const tokenService = require('../../services/security/tokenService');
@@ -211,11 +211,57 @@ const resetPassword = async (req, res) => {
     }
 };
 
+// Change password for authenticated user
+const changePassword = async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const { currentPassword, newPassword } = req.body;
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'Current and new password are required' });
+        }
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: 'New password must be at least 6 characters' });
+        }
+
+        // Get user to verify current password
+        const user = await findUserById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        if (!user.password_hash) {
+            return res.status(400).json({ error: 'Password not set for this account' });
+        }
+        let valid = false;
+        try {
+            valid = await bcrypt.compare(currentPassword, user.password_hash);
+        } catch (e) {
+            // Handle invalid hash edge cases gracefully
+            return res.status(400).json({ error: 'Current password is incorrect' });
+        }
+        if (!valid) {
+            return res.status(400).json({ error: 'Current password is incorrect' });
+        }
+
+        // Hash and update
+        const newHash = await bcrypt.hash(newPassword, 10);
+        await updateUserPassword(userId, newHash);
+        return res.status(200).json({ message: 'Password changed successfully' });
+    } catch (error) {
+        console.error('Error changing password:', error);
+        return res.status(500).json({ error: 'Failed to change password' });
+    }
+};
+
 module.exports = {
     signupUser,
     loginUser,
     getUserProfile,
     savePushToken,
     forgotPassword,
-    resetPassword
+    resetPassword,
+    changePassword
 }

@@ -165,7 +165,7 @@ const deleteMessage = async (req, res) => {
       });
     }
 
-    if (message.senderId !== req.user.id) {
+    if (message.sender_id !== req.user.id) {
       return res.status(403).json({ 
         success: false, 
         error: 'Not authorized to delete this message' 

@@ -15,19 +15,68 @@ const createJournal = async (journalData) => {
   return result.rows[0];
 };
 
-// Get journal by user ID and date
+// Get all journal entries by user ID and date
 const getJournalByDate = async (userId, date) => {
+  // Handle both YYYY-MM-DD format and full ISO date
+  let startDate, endDate;
+  
+  if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    // YYYY-MM-DD format - create date range for the entire day
+    startDate = new Date(date + 'T00:00:00.000Z').toISOString();
+    endDate = new Date(date + 'T23:59:59.999Z').toISOString();
+  } else {
+    // Full ISO date - use as is
+    startDate = date;
+    endDate = date;
+  }
+  
   const query = `
-    SELECT j.*, u.username as creator_username
+    SELECT j.*, u.username as creator_username,
+           (SELECT content FROM journal_messages 
+            WHERE journal_id = j.journal_id 
+            AND type = 'text' 
+            ORDER BY created_at ASC 
+            LIMIT 1) as content
     FROM journals j
     JOIN users u ON j.user_id = u.id
-    WHERE (j.user_id = $1 OR j.partner_id = $1) AND j.date = $2
+    WHERE (j.user_id = $1 OR j.partner_id = $1) 
+    AND j.date >= $2 AND j.date <= $3
     ORDER BY j.created_at DESC
-    LIMIT 1
   `;
   
-  const result = await db.query(query, [userId, date]);
-  return result.rows[0] || null;
+  const result = await db.query(query, [userId, startDate, endDate]);
+  console.log('Journal query result:', { userId, date, startDate, endDate, count: result.rows.length, result: result.rows });
+  
+  // Debug: Let's also check what messages exist for these journals
+  if (result.rows.length > 0) {
+    for (const journal of result.rows) {
+      const messageQuery = `
+        SELECT content, type, created_at 
+        FROM journal_messages 
+        WHERE journal_id = $1 
+        ORDER BY created_at ASC
+      `;
+      const messageResult = await db.query(messageQuery, [journal.journal_id]);
+      console.log(`Messages for journal ${journal.journal_id}:`, messageResult.rows);
+    }
+  }
+  
+  return result.rows;
+};
+
+// Create a journal message
+const createMessage = async (messageData) => {
+  const { journalId, senderId, type, content, mediaUrl, mediaMetadata, replyToMessageId } = messageData;
+  
+  const query = `
+    INSERT INTO journal_messages (journal_id, sender_id, type, content, media_url, media_metadata, reply_to_message_id)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING *
+  `;
+  
+  const values = [journalId, senderId, type, content, mediaUrl, mediaMetadata, replyToMessageId];
+  const result = await db.query(query, values);
+  return result.rows[0];
 };
 
 // Get calendar data for a specific month
@@ -102,14 +151,15 @@ const getJournalStats = async (userId) => {
   return result.rows[0];
 };
 
-// Check if user is part of a couple (simplified - just check if user has partner_id)
+// Check if user is part of a couple (check both directions of the relationship)
 const isUserInCouple = async (userId, partnerId) => {
   const query = `
     SELECT id FROM users 
-    WHERE id = $1 AND partner_id = $2
+    WHERE (id = $1 AND partner_id = $2) OR (id = $2 AND partner_id = $1)
   `;
   
   const result = await db.query(query, [userId, partnerId]);
+  console.log('isUserInCouple check:', { userId, partnerId, result: result.rows.length > 0 });
   return result.rows.length > 0;
 };
 
@@ -140,6 +190,7 @@ const getJournalTimeline = async (userId) => {
 module.exports = {
   createJournal,
   getJournalByDate,
+  createMessage,
   getCalendarData,
   updateJournal,
   deleteJournal,

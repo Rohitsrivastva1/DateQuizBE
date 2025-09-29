@@ -26,6 +26,7 @@ const questionRoutes = require('./questionManagementRoutes');
 const categoryRoutes = require('./categoryManagementRoutes');
 const dailyQuestionsRoutes = require('./dailyQuestionsRoutes');
 const bulkUploadRoutes = require('./bulkUploadRoutes');
+const { query } = require('../../config/db');
 
 const {
     sendEmailToUser,
@@ -75,6 +76,17 @@ router.use('/questions', questionRoutes);
 router.use('/categories', categoryRoutes);
 router.use('/daily-questions', dailyQuestionsRoutes);
 router.use('/bulk-upload', bulkUploadRoutes);
+
+// ==================== SUPPORT MESSAGES (READ-ONLY FOR ADMIN) ====================
+router.get('/support/messages', requirePermission('support'), async (req, res) => {
+    try {
+        const result = await query('SELECT * FROM support_messages ORDER BY created_at DESC LIMIT 500');
+        res.json({ success: true, messages: result.rows });
+    } catch (error) {
+        console.error('List support messages error:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+});
 
 // ==================== EMAIL MANAGEMENT ROUTES ====================
 

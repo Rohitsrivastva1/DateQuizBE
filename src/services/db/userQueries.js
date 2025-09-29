@@ -58,10 +58,24 @@ const findUserById = async (id) => {
     }
 }
 
+const updateUserPassword = async (id, newPasswordHash) => {
+    try {
+        const { rows } = await db.query(
+            'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2 RETURNING id, username, email',
+            [newPasswordHash, id]
+        );
+        return rows[0];
+    } catch (error) {
+        console.error('Error updating user password:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     createUser,
     findUserByUsername,
     findUserByEmail,
-    findUserById
+    findUserById,
+    updateUserPassword
 }   
 
