@@ -213,6 +213,24 @@ const addReaction = async (req, res) => {
 
     const reaction = await messageQueries.addReaction(messageId, req.user.id, emoji);
 
+    // Fetch updated message with reactions and broadcast to journal subscribers
+    try {
+      const updatedMessage = await messageQueries.getMessageById(messageId);
+      if (global.wsService && updatedMessage?.journal_id) {
+        global.wsService.broadcastToJournal(updatedMessage.journal_id, {
+          type: 'reaction_updated',
+          data: {
+            message_id: updatedMessage.message_id,
+            journal_id: updatedMessage.journal_id,
+            reactions: updatedMessage.reactions,
+            reaction_count: updatedMessage.reaction_count
+          }
+        });
+      }
+    } catch (e) {
+      console.error('Error broadcasting reaction update:', e);
+    }
+
     res.status(201).json({
       success: true,
       data: reaction
@@ -241,12 +259,30 @@ const removeReaction = async (req, res) => {
     }
 
     const removed = await messageQueries.removeReaction(messageId, req.user.id, emoji);
-    
+
     if (!removed) {
       return res.status(404).json({ 
         success: false, 
         error: 'Reaction not found' 
       });
+    }
+
+    // Fetch updated message with reactions and broadcast to journal subscribers
+    try {
+      const updatedMessage = await messageQueries.getMessageById(messageId);
+      if (global.wsService && updatedMessage?.journal_id) {
+        global.wsService.broadcastToJournal(updatedMessage.journal_id, {
+          type: 'reaction_updated',
+          data: {
+            message_id: updatedMessage.message_id,
+            journal_id: updatedMessage.journal_id,
+            reactions: updatedMessage.reactions,
+            reaction_count: updatedMessage.reaction_count
+          }
+        });
+      }
+    } catch (e) {
+      console.error('Error broadcasting reaction removal:', e);
     }
 
     res.json({

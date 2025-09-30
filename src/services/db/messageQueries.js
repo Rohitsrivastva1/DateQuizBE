@@ -17,25 +17,60 @@ const createMessage = async (messageData) => {
 
 // Get messages for a journal with pagination
 const getMessages = async (journalId, limit = 20, offset = 0) => {
-  
   const query = `
     SELECT 
       jm.*,
       u.username as sender_username,
       u.email as sender_email,
-      COUNT(jr.reaction_id) as reaction_count,
-      COUNT(jrr.receipt_id) as read_count
+      COALESCE(reactions.reaction_count, 0) as reaction_count,
+      COALESCE(reads.read_count, 0) as read_count,
+      COALESCE(reactions.reactions, '[]'::json) as reactions
     FROM journal_messages jm
     JOIN users u ON jm.sender_id = u.id
-    LEFT JOIN journal_reactions jr ON jm.message_id = jr.message_id
-    LEFT JOIN journal_read_receipts jrr ON jm.message_id = jrr.message_id
+    LEFT JOIN LATERAL (
+      SELECT 
+        COUNT(*) as reaction_count,
+        json_agg(json_build_object(
+          'user_id', jr.user_id,
+          'emoji', jr.emoji
+        ) ORDER BY jr.created_at ASC) as reactions
+      FROM journal_reactions jr 
+      WHERE jr.message_id = jm.message_id
+    ) reactions ON true
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*) as read_count
+      FROM journal_read_receipts jrr 
+      WHERE jrr.message_id = jm.message_id
+    ) reads ON true
     WHERE jm.journal_id = $1
-    GROUP BY jm.message_id, u.username, u.email
     ORDER BY jm.created_at ASC
     LIMIT $2 OFFSET $3
   `;
-  
+
   const result = await db.query(query, [journalId, limit, offset]);
+
+  // Ensure reactions array is present for each message, even if DB aggregation fails
+  try {
+    if (result.rows.length > 0) {
+      const ids = result.rows.map(r => r.message_id);
+      const reactRes = await db.query(
+        `SELECT message_id, user_id, emoji FROM journal_reactions WHERE message_id = ANY($1::int[]) ORDER BY created_at ASC`,
+        [ids]
+      );
+      const map = new Map();
+      reactRes.rows.forEach(r => {
+        if (!map.has(r.message_id)) map.set(r.message_id, []);
+        map.get(r.message_id).push({ user_id: r.user_id, emoji: r.emoji });
+      });
+      result.rows.forEach(row => {
+        row.reactions = row.reactions || map.get(row.message_id) || [];
+        row.reaction_count = row.reaction_count ?? (row.reactions ? row.reactions.length : 0);
+      });
+    }
+  } catch (e) {
+    console.error('Error hydrating reactions for messages:', e);
+  }
+
   return result.rows;
 };
 
@@ -61,13 +96,13 @@ const deleteMessage = async (messageId) => {
 
 // Add reaction to message
 const addReaction = async (messageId, userId, emoji) => {
+  // Replace any existing reaction by this user for this message with the new emoji
+  await db.query(`DELETE FROM journal_reactions WHERE message_id = $1 AND user_id = $2`, [messageId, userId]);
   const query = `
     INSERT INTO journal_reactions (message_id, user_id, emoji)
     VALUES ($1, $2, $3)
-    ON CONFLICT (message_id, user_id, emoji) DO NOTHING
     RETURNING *
   `;
-  
   const result = await db.query(query, [messageId, userId, emoji]);
   return result.rows[0];
 };
@@ -99,7 +134,24 @@ const markAsRead = async (messageId, userId) => {
 
 // Get message by ID
 const getMessageById = async (messageId) => {
-  const query = `SELECT * FROM journal_messages WHERE message_id = $1`;
+  const query = `
+    SELECT 
+      jm.*,
+      u.username as sender_username,
+      u.email as sender_email,
+      COALESCE(reactions.reactions, '[]'::json) as reactions,
+      COALESCE(reactions.reaction_count, 0) as reaction_count
+    FROM journal_messages jm
+    JOIN users u ON jm.sender_id = u.id
+    LEFT JOIN LATERAL (
+      SELECT 
+        COUNT(*) as reaction_count,
+        json_agg(json_build_object('user_id', jr.user_id, 'emoji', jr.emoji) ORDER BY jr.created_at ASC) as reactions
+      FROM journal_reactions jr 
+      WHERE jr.message_id = jm.message_id
+    ) reactions ON true
+    WHERE jm.message_id = $1
+  `;
   const result = await db.query(query, [messageId]);
   return result.rows[0];
 };

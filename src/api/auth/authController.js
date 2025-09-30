@@ -1,5 +1,6 @@
 const { query } = require('../../config/db');
 const { createUser, findUserByUsername, findUserByEmail, findUserById, updateUserPassword } = require('../../services/db/userQueries');
+const otpService = require('../../services/otpService');
 const pushNotificationService = require('../../services/pushNotificationService');
 const bcrypt = require('bcryptjs');
 const tokenService = require('../../services/security/tokenService');
@@ -211,6 +212,46 @@ const resetPassword = async (req, res) => {
     }
 };
 
+// Delete own account with OTP verification
+const deleteAccount = async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        const { email, otp, reason } = req.body || {};
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        if (!email || !otp) {
+            return res.status(400).json({ error: 'Email and OTP are required' });
+        }
+
+        // Ensure the email belongs to the authenticated user
+        const user = await findUserById(userId);
+        if (!user || user.email !== email) {
+            return res.status(400).json({ error: 'Email does not match authenticated user' });
+        }
+
+        // Verify OTP
+        const verification = otpService.verifyOTP(email, otp);
+        if (!verification.valid) {
+            return res.status(400).json({ error: verification.message || 'Invalid OTP' });
+        }
+
+        // Optionally record reason somewhere (e.g., an audit table). For now, just log.
+        if (reason) {
+            console.log(`User ${userId} requested account deletion. Reason: ${reason}`);
+        }
+
+        // Delete user. ON DELETE CASCADE should clean related rows if configured.
+        await query('DELETE FROM users WHERE id = $1', [userId]);
+
+        return res.status(200).json({ message: 'Account deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting account:', error);
+        return res.status(500).json({ error: 'Failed to delete account' });
+    }
+};
+
 // Change password for authenticated user
 const changePassword = async (req, res) => {
     try {
@@ -263,5 +304,6 @@ module.exports = {
     savePushToken,
     forgotPassword,
     resetPassword,
-    changePassword
+    changePassword,
+    deleteAccount
 }

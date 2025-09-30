@@ -1,6 +1,6 @@
 const express = require('express');
 
-const { signupUser , loginUser, getUserProfile, savePushToken, forgotPassword, resetPassword, changePassword } = require('./authController');
+const { signupUser , loginUser, getUserProfile, savePushToken, forgotPassword, resetPassword, changePassword, deleteAccount } = require('./authController');
 const { sendOTP, verifyOTP } = require('./otpController');
 const {protect} = require('../../middleware/authmiddleware');
 
@@ -20,5 +20,8 @@ router.post('/verify-otp', verifyOTP);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 router.post('/change-password', protect, changePassword);
+
+// Delete account (self) with OTP verification
+router.delete('/delete-account', protect, deleteAccount);
 
 module.exports = router;

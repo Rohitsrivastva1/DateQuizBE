@@ -1,15 +1,23 @@
 const db = require('../../config/db');
 
-// Create a new journal entry
+// Create a new journal entry or return existing one for same (user_id, date)
 const createJournal = async (journalData) => {
   const { userId, partnerId, date, theme, isPrivate, unlockDate } = journalData;
-  
+
+  // Use a CTE to attempt insert; on conflict do nothing, then select existing row
   const query = `
-    INSERT INTO journals (user_id, partner_id, date, theme, is_private, unlock_date)
-    VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING *
+    WITH inserted AS (
+      INSERT INTO journals (user_id, partner_id, date, theme, is_private, unlock_date)
+      VALUES ($1, $2, $3::date, $4, $5, $6)
+      ON CONFLICT (user_id, date) DO NOTHING
+      RETURNING *
+    )
+    SELECT * FROM inserted
+    UNION ALL
+    SELECT * FROM journals WHERE user_id = $1 AND date = $3::date
+    LIMIT 1;
   `;
-  
+
   const values = [userId, partnerId, date, theme, isPrivate, unlockDate];
   const result = await db.query(query, values);
   return result.rows[0];
@@ -20,31 +28,33 @@ const getJournalByDate = async (userId, date) => {
   // Handle both YYYY-MM-DD format and full ISO date
   let startDate, endDate;
   
+  // Normalize to date-only on the DB side to avoid timezone issues
   if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-    // YYYY-MM-DD format - create date range for the entire day
-    startDate = new Date(date + 'T00:00:00.000Z').toISOString();
-    endDate = new Date(date + 'T23:59:59.999Z').toISOString();
-  } else {
-    // Full ISO date - use as is
     startDate = date;
-    endDate = date;
+  } else {
+    // Extract YYYY-MM-DD from ISO string
+    startDate = date.split('T')[0];
   }
+  endDate = startDate; // same day
   
   const query = `
-    SELECT j.*, u.username as creator_username,
-           (SELECT content FROM journal_messages 
-            WHERE journal_id = j.journal_id 
-            AND type = 'text' 
-            ORDER BY created_at ASC 
-            LIMIT 1) as content
+    SELECT 
+      j.*,
+      u.username as creator_username,
+      j.date::date as date_only,
+      (SELECT content FROM journal_messages 
+        WHERE journal_id = j.journal_id 
+        AND type = 'text' 
+        ORDER BY created_at ASC 
+        LIMIT 1) as content
     FROM journals j
     JOIN users u ON j.user_id = u.id
-    WHERE (j.user_id = $1 OR j.partner_id = $1) 
-    AND j.date >= $2 AND j.date <= $3
+    WHERE (j.user_id = $1 OR j.partner_id = $1)
+      AND j.date::date = $2::date
     ORDER BY j.created_at DESC
   `;
   
-  const result = await db.query(query, [userId, startDate, endDate]);
+  const result = await db.query(query, [userId, startDate]);
   console.log('Journal query result:', { userId, date, startDate, endDate, count: result.rows.length, result: result.rows });
   
   // Debug: Let's also check what messages exist for these journals
