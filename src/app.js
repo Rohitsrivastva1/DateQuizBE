@@ -9,6 +9,7 @@ const fs = require('fs');
 
 // Import routes
 const authRoutes = require('./api/auth/authRoutes');
+const adminRoutes = require('./api/admin/adminRoutes');
 const partnerRoutes = require('./api/partner/partnerRoutes');
 const packRoutes = require('./api/packs/packRoutes');
 const journalRoutes = require('./api/journal/journalRoutes');
@@ -42,9 +43,18 @@ app.use(limiter);
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-frontend-domain.com'] 
-    : ['http://localhost:3000', 'http://10.0.2.2:3000', 'exp://192.168.1.100:19000'],
+  origin: process.env.NODE_ENV === 'production'
+    ? [
+        'https://unfoldusweb.onrender.com',
+        'https://your-frontend-domain.com'
+      ]
+    : [
+        'http://localhost:3000',
+        'http://[::1]:3000',
+        'http://10.0.2.2:3000',
+        'exp://192.168.1.100:19000',
+        'https://unfoldusweb.onrender.com'
+      ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-New-Token']
@@ -81,6 +91,7 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/partner', partnerRoutes);
 app.use('/api/packs', packRoutes);
 app.use('/api/journal', journalRoutes);

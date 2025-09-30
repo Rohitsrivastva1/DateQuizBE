@@ -1,7 +1,7 @@
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
-async function createAdminUser() {
+async function createAdminUser(username = 'RohitAd', password = '9695700251') {
     const pool = new Pool({
         host: 'aws-0-ap-southeast-1.pooler.supabase.com',
         port: 6543,
@@ -14,17 +14,17 @@ async function createAdminUser() {
     });
 
     try {
-        console.log('🔍 Creating default admin user...');
+        console.log('🔍 Creating admin user...', username);
         
         // Check if admin user already exists
-        const existingUser = await pool.query('SELECT id FROM admin_users WHERE username = $1', ['admin']);
+        const existingUser = await pool.query('SELECT id FROM admin_users WHERE username = $1', [username]);
         if (existingUser.rows.length > 0) {
             console.log('✅ Admin user already exists');
             return;
         }
         
         // Hash the password
-        const hashedPassword = await bcrypt.hash('admin123', 10);
+        const hashedPassword = await bcrypt.hash(password, 10);
         
         // Create admin user
         const result = await pool.query(
@@ -32,10 +32,10 @@ async function createAdminUser() {
              VALUES ($1, $2, $3, $4, $5, $6, $7) 
              RETURNING id, username, email, role`,
             [
-                'admin',
-                'admin@datequiz.com',
+                username,
+                `${username}@datequiz.com`,
                 hashedPassword,
-                'System Administrator',
+                'Administrator',
                 'super_admin',
                 JSON.stringify({
                     users: true,
@@ -60,5 +60,8 @@ async function createAdminUser() {
     }
 }
 
-createAdminUser();
+// Allow overriding via CLI args
+const usernameArg = process.argv[2] || 'RohitAd';
+const passwordArg = process.argv[3] || '9695700251';
+createAdminUser(usernameArg, passwordArg);
 
