@@ -4,17 +4,39 @@ const { body, param, query } = require('express-validator');
 const journalController = require('./journalController');
 const messageController = require('./messageController');
 const { protect } = require('../../middleware/authmiddleware');
+const { commonRules, handleValidationErrors, validateFileUpload } = require('../../middleware/inputValidation');
 
 // Journal routes
+// Normalize client payloads that send fields under body.data
+const normalizeJournalBody = (req, res, next) => {
+  try {
+    if (req.body && req.body.data && typeof req.body.data === 'object') {
+      Object.assign(req.body, req.body.data);
+      delete req.body.data;
+    }
+  } catch (_) {}
+  next();
+};
+
 router.post('/:coupleId/date/:date', 
   protect,
+  normalizeJournalBody,
   [
-    param('coupleId').isInt().withMessage('Couple ID must be an integer'),
-    param('date').isISO8601().withMessage('Date must be in ISO 8601 format'),
-    body('theme').optional().isString().isLength({ max: 50 }).withMessage('Theme must be a string with max 50 characters'),
-    body('isPrivate').optional().isBoolean().withMessage('isPrivate must be a boolean'),
-    body('unlockDate').optional().isISO8601().withMessage('Unlock date must be in ISO 8601 format')
+    param('coupleId').isInt({ min: 1 }).withMessage('Couple ID must be a positive integer'),
+    param('date').custom(value => {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(value)) {
+        throw new Error('Date must be in YYYY-MM-DD format');
+      }
+      const date = new Date(value + 'T00:00:00.000Z');
+      if (isNaN(date.getTime())) {
+        throw new Error('Invalid date');
+      }
+      return true;
+    }),
+    ...commonRules.journalContent
   ],
+  handleValidationErrors,
   journalController.createOrGetJournal
 );
 
@@ -80,13 +102,10 @@ router.get('/:coupleId/timeline',
 router.post('/:journalId/messages',
   protect,
   [
-    param('journalId').isInt().withMessage('Journal ID must be an integer'),
-    body('type').isIn(['text', 'image', 'audio', 'emoji', 'system']).withMessage('Type must be one of: text, image, audio, emoji, system'),
-    body('content').optional().isString().isLength({ max: 2000 }).withMessage('Content must be a string with max 2000 characters'),
-    body('mediaUrl').optional().isURL().withMessage('Media URL must be a valid URL'),
-    body('mediaMetadata').optional().isObject().withMessage('Media metadata must be an object'),
-    body('replyToMessageId').optional().isInt().withMessage('Reply to message ID must be an integer')
+    param('journalId').isInt({ min: 1 }).withMessage('Journal ID must be a positive integer'),
+    ...commonRules.messageContent
   ],
+  handleValidationErrors,
   messageController.sendMessage
 );
 

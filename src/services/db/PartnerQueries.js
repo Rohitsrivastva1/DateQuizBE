@@ -16,27 +16,27 @@ const findPendingRequests = async (requester_id, receiver_id) => {
 
     const query = ` SELECT * FROM partner_requests WHERE ((requester_id = $1 AND receiver_id = $2) OR (requester_id = $2 AND receiver_id = $1)) AND status = 'pending'`;
 
-    const {rows} = await db.query(query, [requester_id, receiver_id]);
+    const { rows } = await db.query(query, [requester_id, receiver_id]);
 
     return rows[0];
 
-}       
+}
 
 const findAnyExistingRequest = async (requester_id, receiver_id) => {
 
     const query = ` SELECT * FROM partner_requests WHERE ((requester_id = $1 AND receiver_id = $2) OR (requester_id = $2 AND receiver_id = $1))`;
 
-    const {rows} = await db.query(query, [requester_id, receiver_id]);
+    const { rows } = await db.query(query, [requester_id, receiver_id]);
 
     return rows[0];
 
-}       
+}
 
 const findIncomingRequests = async (user_id) => {
-    
+
     const query = ` SELECT pr.id,pr.requester_id, u.username as requester_username From partner_requests pr JOIN users u ON pr.requester_id = u.id WHERE pr.receiver_id = $1 AND pr.status = 'pending'`;
 
-    const {rows} = await db.query(query, [user_id]);
+    const { rows } = await db.query(query, [user_id]);
     return { requests: rows };
 }
 
@@ -44,7 +44,7 @@ const updateRequestStatus = async (request_id, status) => {
 
     const query = ` UPDATE partner_requests SET status = $1, updated_at = current_timestamp WHERE id = $2 returning *`;
 
-    const {rows} = await db.query(query, [status, request_id]);
+    const { rows } = await db.query(query, [status, request_id]);
 
     return rows[0];
 }
@@ -65,10 +65,21 @@ const disconnectPartners = async (user1_id, user2_id) => {
 }
 
 const createPartnerRequestNotification = async (receiver_id, requester_username) => {
-    const query = ` INSERT INTO daily_notifications (user_id, notification_type, message) VALUES ($1, 'partner_request', $2)`;
+    const query = ` INSERT INTO daily_notifications (user_id, notification_type, title, message) VALUES ($1, 'partner_request', $2, $3)`;
+    const title = 'Partner Request';
     const message = `${requester_username} sent you a partner request!`;
-    await db.query(query, [receiver_id, message]);
-    
+    await db.query(query, [receiver_id, title, message]);
+
+    // Broadcast via Socket.IO
+    if (global.socketService) {
+        global.socketService.broadcastToUser(receiver_id, {
+            type: 'partner_request',
+            title,
+            message,
+            requesterUsername
+        });
+    }
+
     // Send push notification
     try {
         await pushNotificationService.sendPartnerRequestNotification(receiver_id, requester_username);
@@ -78,12 +89,24 @@ const createPartnerRequestNotification = async (receiver_id, requester_username)
 }
 
 const createPartnerResponseNotification = async (requester_id, receiver_username, response) => {
-    const query = ` INSERT INTO daily_notifications (user_id, notification_type, message) VALUES ($1, 'partner_response', $2)`;
-    const message = response === 'approved' 
+    const query = ` INSERT INTO daily_notifications (user_id, notification_type, title, message) VALUES ($1, 'partner_response', $2, $3)`;
+    const title = 'Partner Response';
+    const message = response === 'approved'
         ? `${receiver_username} accepted your partner request! You are now partners! 💕`
         : `${receiver_username} declined your partner request.`;
-    await db.query(query, [requester_id, message]);
-    
+    await db.query(query, [requester_id, title, message]);
+
+    // Broadcast via Socket.IO
+    if (global.socketService) {
+        global.socketService.broadcastToUser(requester_id, {
+            type: 'partner_response',
+            title,
+            message,
+            response,
+            receiverUsername: receiver_username
+        });
+    }
+
     // Send push notification
     try {
         await pushNotificationService.sendPartnerResponseNotification(requester_id, receiver_username, response === 'approved');
@@ -92,7 +115,7 @@ const createPartnerResponseNotification = async (requester_id, receiver_username
     }
 }
 
-module.exports = { 
+module.exports = {
     createrPartnerRequest,
     findPendingRequests,
     findAnyExistingRequest,

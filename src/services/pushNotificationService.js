@@ -109,6 +109,24 @@ class PushNotificationService {
         );
     }
 
+    // Send journal message notification
+    async sendJournalMessageNotification(receiverId, senderUsername, messageContent, journalId) {
+        const truncatedContent = messageContent.length > 50 
+            ? messageContent.substring(0, 50) + '...' 
+            : messageContent;
+
+        return await this.sendPushNotification(
+            receiverId,
+            'New Journal Message 💬',
+            `${senderUsername}: ${truncatedContent}`,
+            {
+                type: 'journal-message',
+                journalId: journalId,
+                senderUsername
+            }
+        );
+    }
+
     // Send partner turn notification
     async sendPartnerTurnNotification(userId, questionText, isWaitingForMe) {
         const title = isWaitingForMe ? 'Your Turn! 💕' : 'Partner Answered! 💕';

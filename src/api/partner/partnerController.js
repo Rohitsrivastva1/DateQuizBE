@@ -125,20 +125,36 @@ const getPartnerStatus = async (req, res) => {
     const userId = req.user.id;
     
     try {
-        const hasPartner = !!req.user.partner_id;
+        // Check for partner via partner_requests table (more reliable than user.partner_id)
+        const partnerQuery = `
+            SELECT 
+                CASE 
+                    WHEN pr.requester_id = $1 THEN pr.receiver_id
+                    ELSE pr.requester_id
+                END as partner_id,
+                u.username as partner_username,
+                u.id as partner_user_id
+            FROM partner_requests pr
+            JOIN users u ON u.id = (
+                CASE 
+                    WHEN pr.requester_id = $1 THEN pr.receiver_id
+                    ELSE pr.requester_id
+                END
+            )
+            WHERE (pr.requester_id = $1 OR pr.receiver_id = $1) AND pr.status = 'approved'
+            LIMIT 1
+        `;
+        const partnerResult = await db.query(partnerQuery, [userId]);
+        
+        const hasPartner = partnerResult.rows.length > 0;
         let partnerInfo = null;
-        let partnerLink = null;
         let coupleName = null;
         
         if (hasPartner) {
-            // Get partner information
-            // You'll need to implement this query
-            // partnerInfo = await findPartnerInfo(req.user.partner_id);
-            
-            // For demo purposes
+            const partner = partnerResult.rows[0];
             partnerInfo = {
-                id: req.user.partner_id,
-                username: 'Partner User' // Replace with actual query
+                id: partner.partner_id,
+                username: partner.partner_username
             };
             
             // Get couple name
@@ -147,17 +163,14 @@ const getPartnerStatus = async (req, res) => {
                 FROM couple_names
                 WHERE (user_id = $1 AND partner_id = $2) OR (user_id = $2 AND partner_id = $1)
             `;
-            const coupleNameResult = await db.query(coupleNameQuery, [userId, req.user.partner_id]);
-            coupleName = coupleNameResult.rows[0]?.couple_name;
-            
-            // Generate partner link if needed
-            // partnerLink = `datequiz://partner/connect/${linkToken}`;
+            const coupleNameResult = await db.query(coupleNameQuery, [userId, partner.partner_id]);
+            coupleName = coupleNameResult.rows[0]?.couple_name || null;
         }
         
         res.status(200).json({
+            success: true,
             hasPartner,
             partnerInfo,
-            partnerLink,
             coupleName
         });
         

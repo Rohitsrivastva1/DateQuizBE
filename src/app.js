@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -26,38 +27,144 @@ const WebSocketService = require('./services/websocket/websocketService');
 
 const app = express();
 
-// Security middleware
+// Enhanced security middleware with comprehensive headers
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
+  // Content Security Policy
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      upgradeInsecureRequests: []
+    }
+  },
+  // Cross-Origin policies
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: { policy: "same-origin" },
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  
+  // DNS prefetch control
+  dnsPrefetchControl: { allow: false },
+  
+  // Expect-CT header
+  expectCt: {
+    maxAge: 86400,
+    enforce: true
+  },
+  
+  // Feature Policy
+  featurePolicy: {
+    camera: ["'none'"],
+    microphone: ["'none'"],
+    geolocation: ["'none'"],
+    payment: ["'none'"]
+  },
+  
+  // Hide X-Powered-By header
+  hidePoweredBy: true,
+  
+  // HSTS (HTTP Strict Transport Security)
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  },
+  
+  // IE No Open
+  ieNoOpen: true,
+  
+  // No Sniff
+  noSniff: true,
+  
+  // Origin Agent Cluster
+  originAgentCluster: true,
+  
+  // Permissions Policy
+  permissionsPolicy: {
+    camera: [],
+    microphone: [],
+    geolocation: [],
+    payment: [],
+    usb: [],
+    magnetometer: [],
+    gyroscope: [],
+    accelerometer: []
+  },
+  
+  // Referrer Policy
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  
+  // XSS Protection
+  xssFilter: true
 }));
 
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === 'production' ? 300 : 2000,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Allow high-frequency fetches in development for packs and read-only GETs
+    if (process.env.NODE_ENV !== 'production') {
+      if (req.method === 'GET' && req.path.startsWith('/api/packs')) return true;
+      if (req.method === 'GET' && req.path.startsWith('/health')) return true;
+    }
+    return false;
+  }
 });
 app.use(limiter);
 
-// CORS configuration
+// CORS configuration with enhanced security
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production'
-    ? [
-        'https://unfoldusweb.onrender.com',
-        'https://your-frontend-domain.com'
-      ]
-    : [
-        'http://localhost:3000',
-        'http://[::1]:3000',
-        'http://10.0.2.2:3000',
-        'exp://192.168.1.100:19000',
-        'https://unfoldusweb.onrender.com'
-      ],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = process.env.NODE_ENV === 'production'
+      ? [
+          'https://unfoldusweb.onrender.com',
+          'https://datequiz.com',
+          'https://www.datequiz.com'
+        ]
+      : [
+          'http://localhost:3000',
+          'http://127.0.0.1:3000',
+          'http://[::1]:3000',
+          'http://10.0.2.2:3000', // Android emulator
+          'exp://192.168.1.100:19000', // Expo development
+          'exp://localhost:19000', // Expo local
+          'https://unfoldusweb.onrender.com' // Production fallback
+        ];
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS: Blocked request from origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-New-Token']
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-New-Token',
+    'X-Requested-With',
+    'Accept',
+    'Origin'
+  ],
+  exposedHeaders: ['X-New-Token'],
+  maxAge: 86400, // 24 hours
+  optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));

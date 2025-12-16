@@ -52,9 +52,16 @@ module.exports = {
         file: process.env.LOG_FILE || './logs/app.log'
     },
     
-    // Rate limiting - DISABLED for development
+    // Rate limiting - ENABLED with higher limits for development
     rateLimit: {
         windowMs: 15 * 60 * 1000, // 15 minutes
-        max: 0 // 0 means no limit (disabled)
+        max: 1000, // 1000 requests per 15 minutes (higher than production)
+        message: 'Too many requests from this IP, please try again later.',
+        standardHeaders: true,
+        legacyHeaders: false,
+        // Skip successful requests to reduce noise
+        skipSuccessfulRequests: true,
+        // Skip failed requests to avoid blocking legitimate users
+        skipFailedRequests: false
     }
 };

@@ -1,6 +1,9 @@
 const fileStorage = require('../../services/fileStorage');
 const messageQueries = require('../../services/db/messageQueries');
 const { validationResult } = require('express-validator');
+const { validateFileUpload } = require('../../middleware/inputValidation');
+const path = require('path');
+const fs = require('fs');
 
 // Upload media files
 const uploadMedia = async (req, res) => {
@@ -38,12 +41,33 @@ const uploadMedia = async (req, res) => {
 
     for (const file of req.files) {
       try {
-        // Validate file
-        const validation = fileStorage.validateFile(file);
+        // Enhanced file validation with user quota check
+        const validation = await fileStorage.validateFile(file, req.user.id);
         if (!validation.isValid) {
           uploadErrors.push({
             filename: file.originalname,
             errors: validation.errors
+          });
+          continue;
+        }
+
+        // Scan file for malware
+        const scanResult = await fileStorage.scanFileForMalware(file.path);
+        if (!scanResult.clean) {
+          uploadErrors.push({
+            filename: file.originalname,
+            errors: [`File rejected: ${scanResult.reason}`]
+          });
+          continue;
+        }
+
+        // Validate file signature
+        const fileBuffer = fs.readFileSync(file.path);
+        const isValidSignature = fileStorage.validateFileSignature(fileBuffer, file.mimetype);
+        if (!isValidSignature) {
+          uploadErrors.push({
+            filename: file.originalname,
+            errors: ['File signature validation failed - file may be corrupted or malicious']
           });
           continue;
         }
@@ -70,8 +94,14 @@ const uploadMedia = async (req, res) => {
           continue;
         }
 
-        // Generate metadata
+        // Generate enhanced metadata with security info
         const metadata = fileStorage.generateFileMetadata(file, processedPath);
+        metadata.security = {
+          scanned: true,
+          clean: true,
+          signatureValid: true,
+          scannedAt: new Date().toISOString()
+        };
 
         // Create message record
         const message = await messageQueries.createMessage({

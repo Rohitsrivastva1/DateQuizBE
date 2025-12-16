@@ -592,38 +592,85 @@ const markNotificationRead = async (req, res) => {
     }
 };
 
-// Get question history
+// Get question history with improved partner lookup
 const getQuestionHistory = async (req, res) => {
     try {
         const userId = req.user.id;
         const { page = 1, limit = 10 } = req.query;
         const offset = (page - 1) * limit;
 
+        // Get partner ID first
+        const partnerQuery = `
+            SELECT 
+                CASE 
+                    WHEN pr.requester_id = $1 THEN pr.receiver_id
+                    ELSE pr.requester_id
+                END as partner_id
+            FROM partner_requests pr
+            WHERE (pr.requester_id = $1 OR pr.receiver_id = $1) AND pr.status = 'approved'
+            LIMIT 1
+        `;
+        const partnerResult = await pool.query(partnerQuery, [userId]);
+        const partnerId = partnerResult.rows[0]?.partner_id || null;
+
         const historyQuery = `
             SELECT 
+                dq.id as question_id,
                 dq.question_text,
                 dq.category,
                 dq.question_date,
                 uda.answer_text as user_answer,
                 uda.answered_at,
-                pda.answer_text as partner_answer,
-                pda.answered_at as partner_answered_at
+                ${partnerId ? `pda.answer_text as partner_answer,
+                pda.answered_at as partner_answered_at,` : `NULL as partner_answer,
+                NULL as partner_answered_at,`}
+                CASE 
+                    WHEN uda.id IS NOT NULL AND ${partnerId ? 'pda.id IS NOT NULL' : 'FALSE'} THEN true
+                    ELSE false
+                END as both_answered
             FROM daily_questions dq
             LEFT JOIN user_daily_answers uda ON dq.id = uda.question_id AND uda.user_id = $1
-            LEFT JOIN user_daily_answers pda ON dq.id = pda.question_id AND pda.user_id = (
-                SELECT partner_id FROM users WHERE id = $1
-            )
-            WHERE dq.question_date <= CURRENT_DATE
+            ${partnerId ? `LEFT JOIN user_daily_answers pda ON dq.id = pda.question_id AND pda.user_id = $2` : ''}
+            WHERE dq.question_date <= CURRENT_DATE AND dq.is_active = true
             ORDER BY dq.question_date DESC
-            LIMIT $2 OFFSET $3
+            LIMIT $${partnerId ? '3' : '2'} OFFSET $${partnerId ? '4' : '3'}
         `;
-        const historyResult = await pool.query(historyQuery, [userId, limit, offset]);
+        
+        const queryParams = partnerId ? [userId, partnerId, limit, offset] : [userId, limit, offset];
+        const historyResult = await pool.query(historyQuery, queryParams);
+
+        // Get total count for pagination
+        const countQuery = `
+            SELECT COUNT(*) as total
+            FROM daily_questions dq
+            WHERE dq.question_date <= CURRENT_DATE AND dq.is_active = true
+        `;
+        const countResult = await pool.query(countQuery);
+        const total = parseInt(countResult.rows[0].total);
 
         res.json({
             success: true,
-            history: historyResult.rows,
-            page: parseInt(page),
-            limit: parseInt(limit)
+            history: historyResult.rows.map(row => ({
+                questionId: row.question_id,
+                text: row.question_text,
+                category: row.category,
+                date: row.question_date,
+                userAnswer: row.user_answer ? {
+                    text: row.user_answer,
+                    answeredAt: row.answered_at
+                } : null,
+                partnerAnswer: row.partner_answer ? {
+                    text: row.partner_answer,
+                    answeredAt: row.partner_answered_at
+                } : null,
+                bothAnswered: row.both_answered
+            })),
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total: total,
+                totalPages: Math.ceil(total / limit)
+            }
         });
 
     } catch (error) {
@@ -631,6 +678,246 @@ const getQuestionHistory = async (req, res) => {
         res.status(500).json({ 
             success: false, 
             message: 'Internal server error' 
+        });
+    }
+};
+
+// Get partner answer comparison for a specific question
+const getPartnerAnswerComparison = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { questionId } = req.params;
+
+        // Get partner ID
+        const partnerQuery = `
+            SELECT 
+                CASE 
+                    WHEN pr.requester_id = $1 THEN pr.receiver_id
+                    ELSE pr.requester_id
+                END as partner_id,
+                u.username as partner_username
+            FROM partner_requests pr
+            JOIN users u ON u.id = (
+                CASE 
+                    WHEN pr.requester_id = $1 THEN pr.receiver_id
+                    ELSE pr.requester_id
+                END
+            )
+            WHERE (pr.requester_id = $1 OR pr.receiver_id = $1) AND pr.status = 'approved'
+            LIMIT 1
+        `;
+        const partnerResult = await pool.query(partnerQuery, [userId]);
+        
+        if (partnerResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No partner found'
+            });
+        }
+
+        const partner = partnerResult.rows[0];
+
+        // Get question and both answers
+        const comparisonQuery = `
+            SELECT 
+                dq.id as question_id,
+                dq.question_text,
+                dq.category,
+                dq.question_date,
+                u.username as user_username,
+                ua.answer_text as user_answer,
+                ua.answered_at as user_answered_at,
+                pa.answer_text as partner_answer,
+                pa.answered_at as partner_answered_at,
+                EXTRACT(EPOCH FROM (pa.answered_at - ua.answered_at)) as time_difference_seconds
+            FROM daily_questions dq
+            LEFT JOIN user_daily_answers ua ON dq.id = ua.question_id AND ua.user_id = $1
+            LEFT JOIN user_daily_answers pa ON dq.id = pa.question_id AND pa.user_id = $2
+            LEFT JOIN users u ON u.id = $1
+            WHERE dq.id = $3
+        `;
+        const comparisonResult = await pool.query(comparisonQuery, [userId, partner.partner_id, questionId]);
+
+        if (comparisonResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Question not found'
+            });
+        }
+
+        const data = comparisonResult.rows[0];
+
+        res.json({
+            success: true,
+            question: {
+                id: data.question_id,
+                text: data.question_text,
+                category: data.category,
+                date: data.question_date
+            },
+            answers: {
+                user: {
+                    username: data.user_username,
+                    answer: data.user_answer,
+                    answeredAt: data.user_answered_at
+                },
+                partner: {
+                    username: partner.partner_username,
+                    answer: data.partner_answer,
+                    answeredAt: data.partner_answered_at
+                },
+                timeDifference: data.time_difference_seconds ? {
+                    seconds: Math.abs(data.time_difference_seconds),
+                    minutes: Math.abs(Math.floor(data.time_difference_seconds / 60)),
+                    hours: Math.abs(Math.floor(data.time_difference_seconds / 3600)),
+                    answeredFirst: data.time_difference_seconds > 0 ? 'partner' : 'user'
+                } : null,
+                bothAnswered: data.user_answer !== null && data.partner_answer !== null
+            }
+        });
+
+    } catch (error) {
+        console.error('Error getting partner answer comparison:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+        });
+    }
+};
+
+// Get analytics for daily questions
+const getDailyQuestionsAnalytics = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { days = 30 } = req.query; // Default to last 30 days
+
+        // Get partner ID
+        const partnerQuery = `
+            SELECT 
+                CASE 
+                    WHEN pr.requester_id = $1 THEN pr.receiver_id
+                    ELSE pr.requester_id
+                END as partner_id
+            FROM partner_requests pr
+            WHERE (pr.requester_id = $1 OR pr.receiver_id = $1) AND pr.status = 'approved'
+            LIMIT 1
+        `;
+        const partnerResult = await pool.query(partnerQuery, [userId]);
+        const partnerId = partnerResult.rows[0]?.partner_id || null;
+
+        // Overall statistics
+        const statsQuery = `
+            SELECT 
+                COUNT(DISTINCT dq.id) as total_questions,
+                COUNT(DISTINCT CASE WHEN ua.id IS NOT NULL THEN dq.id END) as user_answered,
+                COUNT(DISTINCT CASE WHEN ${partnerId ? 'pa.id IS NOT NULL' : 'FALSE'} THEN dq.id END) as partner_answered,
+                COUNT(DISTINCT CASE WHEN ua.id IS NOT NULL AND ${partnerId ? 'pa.id IS NOT NULL' : 'FALSE'} THEN dq.id END) as both_answered,
+                AVG(CASE WHEN ua.answered_at IS NOT NULL THEN 1.0 ELSE 0.0 END) * 100 as user_answer_rate,
+                AVG(CASE WHEN ${partnerId ? 'pa.answered_at IS NOT NULL' : 'FALSE'} THEN 1.0 ELSE 0.0 END) * 100 as partner_answer_rate
+            FROM daily_questions dq
+            LEFT JOIN user_daily_answers ua ON dq.id = ua.question_id AND ua.user_id = $1
+            ${partnerId ? `LEFT JOIN user_daily_answers pa ON dq.id = pa.question_id AND pa.user_id = $2` : ''}
+            WHERE dq.question_date >= CURRENT_DATE - INTERVAL '${parseInt(days)} days'
+                AND dq.question_date <= CURRENT_DATE
+                AND dq.is_active = true
+        `;
+        
+        const statsParams = partnerId ? [userId, partnerId] : [userId];
+        const statsResult = await pool.query(statsQuery, statsParams);
+        const stats = statsResult.rows[0];
+
+        // Category breakdown
+        const categoryQuery = `
+            SELECT 
+                dq.category,
+                COUNT(DISTINCT dq.id) as total_questions,
+                COUNT(DISTINCT CASE WHEN ua.id IS NOT NULL THEN dq.id END) as answered_count
+            FROM daily_questions dq
+            LEFT JOIN user_daily_answers ua ON dq.id = ua.question_id AND ua.user_id = $1
+            WHERE dq.question_date >= CURRENT_DATE - INTERVAL '${parseInt(days)} days'
+                AND dq.question_date <= CURRENT_DATE
+                AND dq.is_active = true
+            GROUP BY dq.category
+            ORDER BY answered_count DESC
+        `;
+        const categoryResult = await pool.query(categoryQuery, [userId]);
+
+        // Daily activity (last 7 days)
+        const dailyActivityQuery = `
+            SELECT 
+                DATE(dq.question_date) as date,
+                COUNT(DISTINCT dq.id) as questions_available,
+                COUNT(DISTINCT CASE WHEN ua.id IS NOT NULL THEN dq.id END) as user_answered,
+                COUNT(DISTINCT CASE WHEN ${partnerId ? 'pa.id IS NOT NULL' : 'FALSE'} THEN dq.id END) as partner_answered
+            FROM daily_questions dq
+            LEFT JOIN user_daily_answers ua ON dq.id = ua.question_id AND ua.user_id = $1
+            ${partnerId ? `LEFT JOIN user_daily_answers pa ON dq.id = pa.question_id AND pa.user_id = $2` : ''}
+            WHERE dq.question_date >= CURRENT_DATE - INTERVAL '6 days'
+                AND dq.question_date <= CURRENT_DATE
+                AND dq.is_active = true
+            GROUP BY DATE(dq.question_date)
+            ORDER BY date DESC
+        `;
+        const dailyActivityResult = await pool.query(dailyActivityQuery, partnerId ? [userId, partnerId] : [userId]);
+
+        // Answer timing analysis
+        const timingQuery = `
+            SELECT 
+                EXTRACT(HOUR FROM ua.answered_at) as hour,
+                COUNT(*) as answer_count
+            FROM user_daily_answers ua
+            JOIN daily_questions dq ON ua.question_id = dq.id
+            WHERE ua.user_id = $1
+                AND dq.question_date >= CURRENT_DATE - INTERVAL '${parseInt(days)} days'
+            GROUP BY EXTRACT(HOUR FROM ua.answered_at)
+            ORDER BY hour
+        `;
+        const timingResult = await pool.query(timingQuery, [userId]);
+
+        res.json({
+            success: true,
+            period: {
+                days: parseInt(days),
+                startDate: new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                endDate: new Date().toISOString().split('T')[0]
+            },
+            overall: {
+                totalQuestions: parseInt(stats.total_questions),
+                userAnswered: parseInt(stats.user_answered),
+                partnerAnswered: partnerId ? parseInt(stats.partner_answered) : null,
+                bothAnswered: partnerId ? parseInt(stats.both_answered) : null,
+                userAnswerRate: parseFloat(stats.user_answer_rate).toFixed(1),
+                partnerAnswerRate: partnerId ? parseFloat(stats.partner_answer_rate).toFixed(1) : null,
+                completionRate: partnerId && stats.total_questions > 0 
+                    ? ((parseInt(stats.both_answered) / parseInt(stats.total_questions)) * 100).toFixed(1)
+                    : null
+            },
+            byCategory: categoryResult.rows.map(row => ({
+                category: row.category,
+                totalQuestions: parseInt(row.total_questions),
+                answeredCount: parseInt(row.answered_count),
+                answerRate: row.total_questions > 0 
+                    ? ((parseInt(row.answered_count) / parseInt(row.total_questions)) * 100).toFixed(1)
+                    : '0.0'
+            })),
+            dailyActivity: dailyActivityResult.rows.map(row => ({
+                date: row.date,
+                questionsAvailable: parseInt(row.questions_available),
+                userAnswered: parseInt(row.user_answered),
+                partnerAnswered: partnerId ? parseInt(row.partner_answered) : null
+            })),
+            answerTiming: timingResult.rows.map(row => ({
+                hour: parseInt(row.hour),
+                answerCount: parseInt(row.answer_count)
+            })),
+            hasPartner: partnerId !== null
+        });
+
+    } catch (error) {
+        console.error('Error getting daily questions analytics:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
         });
     }
 };
@@ -896,5 +1183,7 @@ module.exports = {
     getQuestionHistory,
     clearAllNotifications,
     getMissedQuestions,
-    submitAnswerForQuestion
+    submitAnswerForQuestion,
+    getPartnerAnswerComparison,
+    getDailyQuestionsAnalytics
 };

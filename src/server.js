@@ -1,22 +1,46 @@
 const http = require('http');
 const app = require('./app');
-const WebSocketService = require('./services/websocket/websocketService');
+console.log('🔌 Loading Socket.IO service...');
+let SocketIOService;
+try {
+  SocketIOService = require('./services/socketio/socketioService');
+  console.log('🔌 Socket.IO service loaded:', !!SocketIOService);
+  console.log('🔌 SocketIOService constructor:', typeof SocketIOService);
+} catch (error) {
+  console.error('❌ Error loading Socket.IO service:', error);
+  console.error('❌ Error stack:', error.stack);
+  process.exit(1);
+}
 
 const PORT = process.env.PORT || 5000;
 
 // Create HTTP server
 const server = http.createServer(app);
 
-// Initialize WebSocket service
-const wsService = new WebSocketService(server);
+// Initialize Socket.IO service immediately after creating the server
+console.log('🔌 Initializing Socket.IO service...');
+console.log('🔌 Server object:', !!server);
+console.log('🔌 SocketIOService module:', !!SocketIOService);
 
-// Make WebSocket service available globally for middleware
-global.wsService = wsService;
+try {
+  console.log('🔌 Creating SocketIOService instance...');
+  const socketService = new SocketIOService(server);
+  console.log('🔌 SocketIOService instance created:', !!socketService);
+  
+  // Make Socket.IO service available globally for middleware
+  global.socketService = socketService;
+  console.log('✅ Socket.IO service initialized and available globally');
+  console.log('✅ Socket.IO server attached to HTTP server');
+} catch (error) {
+  console.error('❌ Error initializing Socket.IO service:', error);
+  console.error('❌ Error stack:', error.stack);
+  process.exit(1);
+}
 
 // Start server
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📱 WebSocket available at ws://localhost:${PORT}/ws`);
+  console.log(`📱 Socket.IO available at http://localhost:${PORT}/socket.io/`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   
   if (process.env.NODE_ENV === 'development') {

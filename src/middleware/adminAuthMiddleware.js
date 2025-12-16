@@ -23,7 +23,7 @@ const adminAuth = async (req, res, next) => {
         }
 
         // Verify token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production');
         
         // Check if admin still exists and is active
         const adminQuery = `

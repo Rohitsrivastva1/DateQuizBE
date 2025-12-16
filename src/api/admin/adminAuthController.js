@@ -60,7 +60,7 @@ const adminLogin = async (req, res) => {
                 role: admin.role,
                 permissions: admin.permissions
             },
-            process.env.JWT_SECRET,
+            process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
             { expiresIn: '8h' }
         );
 

@@ -4,15 +4,17 @@ const { body, param, query } = require('express-validator');
 const mediaController = require('./mediaController');
 const fileStorage = require('../../services/fileStorage');
 const { protect } = require('../../middleware/authmiddleware');
+const { commonRules, handleValidationErrors, validateFileUpload } = require('../../middleware/inputValidation');
 
 // Media upload route
 router.post('/:journalId/upload',
   protect,
   [
-    param('journalId').isInt().withMessage('Journal ID must be an integer'),
-    body('type').optional().isIn(['image', 'audio']).withMessage('Type must be either image or audio'),
-    body('replyToMessageId').optional().isInt().withMessage('Reply to message ID must be an integer')
+    param('journalId').isInt({ min: 1 }).withMessage('Journal ID must be a positive integer'),
+    ...commonRules.fileUpload
   ],
+  handleValidationErrors,
+  validateFileUpload,
   fileStorage.upload.array('media', 5), // Allow up to 5 files
   mediaController.uploadMedia
 );

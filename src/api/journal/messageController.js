@@ -35,17 +35,52 @@ const sendMessage = async (req, res) => {
       mediaMetadata,
       replyToMessageId
     });
-
+    
     // Get the complete message with reactions
-    const completeMessage = await messageQueries.getMessageById(message.messageId);
+    const messageId = message.id || message.message_id;
+    const completeMessage = await messageQueries.getMessageById(messageId);
 
     // Broadcast the new message to all clients connected to this journal
-    if (global.wsService) {
-      global.wsService.broadcastToJournal(journalId, {
+    if (global.socketService) {
+      global.socketService.broadcastToJournal(journalId, {
         type: 'new_message',
         data: completeMessage,
         journalId: journalId
       });
+
+      // Also send push notification to partner
+      try {
+        const pushService = require('../../services/pushNotificationService');
+        
+        // Get partner ID for push notification
+        const partnerId = await global.socketService.getPartnerId(req.user.id);
+        console.log('📱 Push notification - Partner ID:', partnerId);
+        
+        if (partnerId) {
+          // Get sender username for notification
+          const db = require('../../services/db/database');
+          const userQuery = 'SELECT username FROM users WHERE id = $1';
+          const { rows } = await db.query(userQuery, [req.user.id]);
+          const senderUsername = rows[0]?.username || 'Your Partner';
+          
+          console.log('📱 Sending push notification to partner:', partnerId, 'from:', senderUsername);
+          
+          const pushResult = await pushService.sendJournalMessageNotification(
+            partnerId,
+            senderUsername,
+            completeMessage.content || 'New message in your journal',
+            journalId
+          );
+          
+          console.log('📱 Push notification result:', pushResult);
+        } else {
+          console.log('📱 No partner found for push notification');
+        }
+      } catch (error) {
+        console.error('❌ Error sending push notification:', error);
+        console.error('❌ Push notification error details:', error.message);
+        // Don't fail the request if push notification fails
+      }
     }
 
     res.status(201).json({
@@ -216,8 +251,20 @@ const addReaction = async (req, res) => {
     // Fetch updated message with reactions and broadcast to journal subscribers
     try {
       const updatedMessage = await messageQueries.getMessageById(messageId);
-      if (global.wsService && updatedMessage?.journal_id) {
-        global.wsService.broadcastToJournal(updatedMessage.journal_id, {
+      console.log('🎭 Updated message:', updatedMessage);
+      console.log('🎭 Global socket service available:', !!global.socketService);
+      
+      if (global.socketService && updatedMessage?.journal_id) {
+        console.log('🎭 Broadcasting reaction update for message:', updatedMessage.message_id);
+        console.log('🎭 Broadcasting to journal:', updatedMessage.journal_id);
+        console.log('🎭 Reaction data:', {
+          message_id: updatedMessage.message_id,
+          journal_id: updatedMessage.journal_id,
+          reactions: updatedMessage.reactions,
+          reaction_count: updatedMessage.reaction_count
+        });
+        
+        global.socketService.broadcastToJournal(updatedMessage.journal_id, {
           type: 'reaction_updated',
           data: {
             message_id: updatedMessage.message_id,
@@ -226,6 +273,12 @@ const addReaction = async (req, res) => {
             reaction_count: updatedMessage.reaction_count
           }
         });
+        
+        console.log('🎭 Reaction broadcast completed');
+      } else {
+        console.log('🎭 Cannot broadcast reaction - missing socket service or journal_id');
+        console.log('🎭 Socket service:', !!global.socketService);
+        console.log('🎭 Journal ID:', updatedMessage?.journal_id);
       }
     } catch (e) {
       console.error('Error broadcasting reaction update:', e);
@@ -270,8 +323,8 @@ const removeReaction = async (req, res) => {
     // Fetch updated message with reactions and broadcast to journal subscribers
     try {
       const updatedMessage = await messageQueries.getMessageById(messageId);
-      if (global.wsService && updatedMessage?.journal_id) {
-        global.wsService.broadcastToJournal(updatedMessage.journal_id, {
+      if (global.socketService && updatedMessage?.journal_id) {
+        global.socketService.broadcastToJournal(updatedMessage.journal_id, {
           type: 'reaction_updated',
           data: {
             message_id: updatedMessage.message_id,

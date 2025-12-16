@@ -60,6 +60,7 @@ app.get('/health', async (req, res) => {
 });
 
 // API routes
+console.log('🔧 Loading API routes...');
 app.use('/api/auth', require('./src/api/auth/authRoutes'));
 app.use('/api/packs', require('./src/api/packs/packRoutes'));
 app.use('/api/partner', require('./src/api/partner/partnerRoutes'));
@@ -67,16 +68,56 @@ app.use('/api/partner-turn', require('./src/api/partner/partnerTurnRoutes'));
 app.use('/api/daily-questions', require('./src/api/daily-questions/dailyQuestionsRoutes'));
 app.use('/api/journal', require('./src/api/journal/journalRoutes'));
 app.use('/api/journal', require('./src/api/journal/mediaRoutes'));
+console.log('✅ Basic API routes loaded');
 
 // Admin API routes
 app.use('/api/admin', require('./src/api/admin/adminRoutes'));
 
+// Security Dashboard routes
+app.use('/api/admin/security', require('./src/api/admin/securityDashboardRoutes'));
+
+// Subscription routes
+console.log('🔧 Loading subscription routes...');
+try {
+  const subscriptionRoutes = require('./src/api/subscription/subscriptionRoutes');
+  app.use('/api/subscription', subscriptionRoutes);
+  console.log('✅ Subscription routes loaded and registered');
+} catch (error) {
+  console.error('❌ Error loading subscription routes:', error.message);
+}
+
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error('Error:', err);
-    res.status(500).json({ 
-        message: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message 
+    // Log error details for debugging (server-side only)
+    console.error('Error:', {
+        message: err.message,
+        stack: err.stack,
+        url: req.url,
+        method: req.method,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        timestamp: new Date().toISOString()
     });
+    
+    // Don't expose sensitive error details in production
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    if (isProduction) {
+        // In production, return generic error message
+        res.status(500).json({ 
+            success: false,
+            message: 'Internal server error',
+            errorId: require('crypto').randomBytes(8).toString('hex') // For tracking
+        });
+    } else {
+        // In development, return detailed error for debugging
+        res.status(500).json({ 
+            success: false,
+            message: err.message,
+            stack: err.stack,
+            details: err
+        });
+    }
 });
 
 // 404 handler

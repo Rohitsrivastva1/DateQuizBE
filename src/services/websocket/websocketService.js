@@ -2,6 +2,8 @@ const WebSocket = require('ws');
 
 class WebSocketService {
   constructor(server) {
+    console.log('🔌 WebSocketService constructor called');
+    console.log('🔌 Server object:', !!server);
     this.server = server;
     this.wss = null;
     this.clients = new Map(); // Store connected clients
@@ -9,6 +11,9 @@ class WebSocketService {
   }
 
   initialize() {
+    console.log('🔌 Initializing WebSocket service...');
+    console.log('🔌 Server object:', !!this.server);
+    
     // Create WebSocket server
     this.wss = new WebSocket.Server({
       server: this.server,
@@ -19,6 +24,7 @@ class WebSocketService {
     this.wss.on('connection', this.handleConnection.bind(this));
     
     console.log('✅ WebSocket service initialized');
+    console.log('✅ WebSocket server created with path: /ws');
   }
 
   verifyClient(info) {
@@ -287,26 +293,43 @@ class WebSocketService {
 
   broadcastToUser(userId, data) {
     // Send message to all connections from a specific user
+    console.log(`📢 Broadcasting to user ${userId}:`, data.type);
+    let sentCount = 0;
+    
     this.clients.forEach((client, clientId) => {
       if (client.userId === userId) {
-        this.sendToClient(clientId, {
+        const success = this.sendToClient(clientId, {
           ...data,
           timestamp: new Date().toISOString()
         });
+        if (success) {
+          sentCount++;
+        }
       }
     });
+    
+    console.log(`📢 Broadcast to user ${userId} completed. Sent to ${sentCount} clients.`);
   }
 
   broadcastToJournal(journalId, data) {
     // Send message to all clients connected to a specific journal
+    console.log(`📢 Broadcasting to journal ${journalId}:`, data.type);
+    let sentCount = 0;
+    
     this.clients.forEach((client, clientId) => {
       if (client.subscribedJournals && client.subscribedJournals.includes(journalId)) {
-        this.sendToClient(clientId, {
+        const success = this.sendToClient(clientId, {
           ...data,
+          journalId: journalId,
           timestamp: new Date().toISOString()
         });
+        if (success) {
+          sentCount++;
+        }
       }
     });
+    
+    console.log(`📢 Broadcast to journal ${journalId} completed. Sent to ${sentCount} clients.`);
   }
 
   generateClientId() {
@@ -327,6 +350,27 @@ class WebSocketService {
       connectedClients: this.getConnectedClients(),
       uptime: process.uptime()
     };
+  }
+
+  // Get partner ID for a user (for notifications)
+  async getPartnerId(userId) {
+    try {
+      const db = require('../db/database');
+      const query = 'SELECT partner_id FROM users WHERE id = $1';
+      const { rows } = await db.query(query, [userId]);
+      return rows[0]?.partner_id || null;
+    } catch (error) {
+      console.error('Error getting partner ID:', error);
+      return null;
+    }
+  }
+
+  // Broadcast to partner of a user
+  async broadcastToPartner(userId, data) {
+    const partnerId = await this.getPartnerId(userId);
+    if (partnerId) {
+      this.broadcastToUser(partnerId, data);
+    }
   }
 }
 

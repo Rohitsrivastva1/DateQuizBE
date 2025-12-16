@@ -12,7 +12,9 @@ const {
     getQuestionHistory,
     clearAllNotifications,
     getMissedQuestions,
-    submitAnswerForQuestion
+    submitAnswerForQuestion,
+    getPartnerAnswerComparison,
+    getDailyQuestionsAnalytics
 } = require('./dailyQuestionsController');
 
 // All routes are protected with authentication
@@ -50,5 +52,11 @@ router.get('/missed', getMissedQuestions);
 
 // Submit answer for a specific question (for missed questions)
 router.post('/answer-question', submitAnswerForQuestion);
+
+// Get partner answer comparison for a specific question
+router.get('/comparison/:questionId', getPartnerAnswerComparison);
+
+// Get analytics for daily questions
+router.get('/analytics', getDailyQuestionsAnalytics);
 
 module.exports = router;
