@@ -49,16 +49,16 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: { policy: "same-origin" },
   crossOriginResourcePolicy: { policy: "cross-origin" },
-  
+
   // DNS prefetch control
   dnsPrefetchControl: { allow: false },
-  
+
   // Expect-CT header
   expectCt: {
     maxAge: 86400,
     enforce: true
   },
-  
+
   // Feature Policy
   featurePolicy: {
     camera: ["'none'"],
@@ -66,26 +66,26 @@ app.use(helmet({
     geolocation: ["'none'"],
     payment: ["'none'"]
   },
-  
+
   // Hide X-Powered-By header
   hidePoweredBy: true,
-  
+
   // HSTS (HTTP Strict Transport Security)
   hsts: {
     maxAge: 31536000,
     includeSubDomains: true,
     preload: true
   },
-  
+
   // IE No Open
   ieNoOpen: true,
-  
+
   // No Sniff
   noSniff: true,
-  
+
   // Origin Agent Cluster
   originAgentCluster: true,
-  
+
   // Permissions Policy
   permissionsPolicy: {
     camera: [],
@@ -97,10 +97,10 @@ app.use(helmet({
     gyroscope: [],
     accelerometer: []
   },
-  
+
   // Referrer Policy
   referrerPolicy: { policy: "strict-origin-when-cross-origin" },
-  
+
   // XSS Protection
   xssFilter: true
 }));
@@ -128,23 +128,26 @@ const corsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
-    
+
     const allowedOrigins = process.env.NODE_ENV === 'production'
       ? [
-          'https://unfoldusweb.onrender.com',
-          'https://datequiz.com',
-          'https://www.datequiz.com'
-        ]
+        'https://unfoldusweb.onrender.com',
+        'https://date-quiz-web7.onrender.com', // Frontend URL
+        'https://datequiz.com',
+        'https://www.datequiz.com'
+      ]
       : [
-          'http://localhost:3000',
-          'http://127.0.0.1:3000',
-          'http://[::1]:3000',
-          'http://10.0.2.2:3000', // Android emulator
-          'exp://192.168.1.100:19000', // Expo development
-          'exp://localhost:19000', // Expo local
-          'https://unfoldusweb.onrender.com' // Production fallback
-        ];
-    
+        'http://localhost:3000',
+        'https://date-quiz-web1.onrender.com',
+        'http://127.0.0.1:3000',
+        'http://[::1]:3000',
+        'http://10.0.2.2:3000', // Android emulator
+        'exp://192.168.1.100:19000', // Expo development
+        'exp://localhost:19000', // Expo local
+        'https://unfoldusweb.onrender.com', // Production fallback
+        'https://date-quiz-web7.onrender.com'
+      ];
+
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -155,8 +158,8 @@ const corsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
+    'Content-Type',
+    'Authorization',
     'X-New-Token',
     'X-Requested-With',
     'Accept',
@@ -191,8 +194,8 @@ app.use('/uploads', express.static(uploadsDir));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development'

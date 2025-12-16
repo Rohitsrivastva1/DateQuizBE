@@ -11,6 +11,7 @@ class SocketIOService {
         origin: process.env.NODE_ENV === 'production'
           ? [
             'https://unfoldusweb.onrender.com',
+            'https://date-quiz-web7.onrender.com',
             'https://your-frontend-domain.com'
           ]
           : [
@@ -20,7 +21,8 @@ class SocketIOService {
             'http://10.0.2.2:3000',
             'exp://192.168.1.100:19000',
             'exp://localhost:19000',
-            'https://unfoldusweb.onrender.com'
+            'https://unfoldusweb.onrender.com',
+            'https://date-quiz-web7.onrender.com'
           ],
         methods: ['GET', 'POST'],
         credentials: true
